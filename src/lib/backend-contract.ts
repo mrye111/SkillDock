@@ -1,7 +1,7 @@
 /**
  * SkillDock 前后端接口契约 —— TypeScript 类型（前端专用）
  *
- * 版本：1.0 · 2026-09-08 · 维护方：后端会话
+ * 版本：1.1 · 2026-09-08 · 维护方：后端会话
  * 权威文档：docs/api-contract.md（语义以该文档为准，二者同步维护）
  *
  * 约定：
@@ -84,7 +84,8 @@ export type ConflictChoice =
   | 'pause_mapping'
   | 'reinstall'
   | 'keep_deleted'
-  | 'transfer_ownership';
+  | 'transfer_ownership'
+  | 'remove_with_backup';
 
 export type TaskStatus =
   | 'queued'
@@ -292,7 +293,14 @@ export interface FileChange {
 }
 
 export interface ConflictInfo {
-  kind: 'unmanaged_same_name' | 'target_modified' | 'both_modified' | 'ownership' | 'restore_drift';
+  kind:
+    | 'unmanaged_same_name'
+    | 'same_content'
+    | 'target_modified'
+    | 'both_modified'
+    | 'target_deleted'
+    | 'ownership'
+    | 'restore_drift';
   message: string;
   availableChoices: ConflictChoice[];
 }

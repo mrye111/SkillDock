@@ -1,10 +1,14 @@
 # SkillDock 前后端接口约定（API Contract）
 
-文档版本：1.0 · 编写日期：2026-09-08 · 维护方：后端会话（src-tauri）
+文档版本：1.1 · 编写日期：2026-09-08 · 维护方：后端会话（src-tauri）
 配套文件：[`src/lib/backend-contract.ts`](../src/lib/backend-contract.ts)（前端 TypeScript 类型，与本文同步维护）
 
 > 接口有任何变化，后端会话必须先更新这两个文件并通知前端会话，再落地实现。
 > 权威需求依据：`docs/SkillDock-需求与技术设计.md` §10.4（命令表）、§7（功能细则）、§8（同步语义）、§11（数据存储）。
+
+**变更记录**
+- 1.1（2026-09-08）：`ConflictInfo.kind` 新增 `same_content`（已有相同内容，可接管）与 `target_deleted`（目标已删除，可重装）；`ConflictChoice` 新增 `remove_with_backup`（移除计划中的「备份当前内容后移除」，§8.3）。均为新增枚举值，非破坏变更。
+- 1.0（2026-09-08）：首版。
 
 ---
 
@@ -106,13 +110,14 @@ type PlanAction =
 /** 冲突选择（resolve_conflict 的 choice；§6.3） */
 type ConflictChoice =
   | 'keep_target'           // 本次保留目标
-  | 'overwrite_with_source' // 备份后用源覆盖
+  | 'overwrite_with_source' // 备份后用源覆盖（恢复计划中表示「确认恢复覆盖」）
   | 'adopt_existing'        // 接管现有目录（内容相同，仅建基线）
   | 'take_over'             // 接管并用源覆盖（非托管同名目录）
   | 'pause_mapping'         // 始终暂停此映射
   | 'reinstall'             // 目标已删除：手动选择重新安装
   | 'keep_deleted'          // 目标已删除：维持删除状态
-  | 'transfer_ownership';   // 来源冲突：明确转移归属
+  | 'transfer_ownership'    // 来源冲突：明确转移归属
+  | 'remove_with_backup';   // 移除计划：看过差异后备份当前内容再移除（§8.3）
 
 /** 任务状态（§11.1） */
 type TaskStatus =
@@ -435,7 +440,13 @@ interface FileChange {
 }
 
 interface ConflictInfo {
-  kind: 'unmanaged_same_name' | 'target_modified' | 'both_modified' | 'ownership' | 'restore_drift';
+  kind: 'unmanaged_same_name' // 非托管同名、内容不同 → [keep_target, take_over]
+      | 'same_content'        // 非托管同名、内容一致 → [adopt_existing, keep_target]
+      | 'target_modified'     // 目标漂移（含移除计划的漂移）→ [keep_target, overwrite_with_source / remove_with_backup, pause_mapping]
+      | 'both_modified'       // 双方已修改 → [keep_target, overwrite_with_source, pause_mapping]
+      | 'target_deleted'      // 目标已删除 → [keep_deleted, reinstall]
+      | 'ownership'           // 来源冲突 → [transfer_ownership, keep_target]
+      | 'restore_drift';      // 恢复点之后又有修改 → [keep_target, overwrite_with_source]
   message: string;
   availableChoices: ConflictChoice[]; // 后端按冲突类型给出可选动作
 }

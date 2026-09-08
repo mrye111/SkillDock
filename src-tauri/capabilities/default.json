@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "SkillDock 默认能力集：前端只能调用核心事件/窗口与目录选择对话框",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "dialog:allow-open",
+    "window-state:default"
+  ]
+}
