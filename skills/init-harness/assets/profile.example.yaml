@@ -1,0 +1,31 @@
+# Example harness.project.yaml for init-harness.
+project_name: my-shop
+base_url: https://staging.example.com
+
+paths:
+  tests_dir: tests
+  data_dir: data
+  page_map_dir: page_map
+  artifacts_dir: artifacts
+
+runner:
+  test_command: python -m pytest tests/ -v
+
+auth:
+  needs_auth: true
+  auth_mode: basic
+  login_url: /login
+  username_env: E2E_USERNAME
+  password_env: E2E_PASSWORD
+  username_selector: 'input[name="email"]'
+  password_selector: 'input[name="password"]'
+  submit_selector: 'button[type="submit"]'
+  post_login_url_pattern: /dashboard
+
+project_contract:
+  primary_flows:
+    - 商品列表搜索
+    - 商品详情查看
+  notes:
+    - 仅测试 staging 环境
+    - 凭据通过环境变量注入

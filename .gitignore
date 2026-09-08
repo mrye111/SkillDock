@@ -1,0 +1,22 @@
+# Rust
+src-tauri/target/
+**/*.rs.bk
+
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Tauri bundle output
+src-tauri/gen/
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local app data (never commit live databases/backups)
+*.db
+*.db-journal

@@ -1,0 +1,4 @@
+interface:
+  display_name: "光影时刻与天气skill"
+  short_description: "先审计底图，再推荐可行的时段、天气、光影与成片方案。"
+  default_prompt: "使用 $lighting-time-weather-skill 先分析这张场景底图，给出可行的时段、天气、光影和成片选项；此阶段不要生成图片。"

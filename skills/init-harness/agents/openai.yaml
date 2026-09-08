@@ -1,0 +1,4 @@
+interface:
+  display_name: "Init Harness"
+  short_description: "初始化并同步多 agent Web 测试 harness"
+  default_prompt: "Use $init-harness to initialize or sync a pytest-playwright multi-agent Web test harness in this project."

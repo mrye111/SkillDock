@@ -1,0 +1,4 @@
+interface:
+  display_name: "接口契约转测试用例"
+  short_description: "根据接口契约生成接口用例、待确认项和评分报告，支持按模块或接口筛选"
+  default_prompt: "Use $api-contract-to-testcases 根据接口契约文档一键生成接口测试要点、接口测试用例、待确认项和审核评分报告；如用户指定模块、接口名或 path 关键字，则按筛选条件输出；如用户要求按模块拆分，则按 tag 分目录生成。"
