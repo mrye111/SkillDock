@@ -142,6 +142,15 @@ type Availability = 'exists' | 'will_create' | 'no_permission' | 'invalid_path' 
 
 ## 4. 命令清单
 
+> **调用时序（前端必读）**：技能列表来自后端数据库，数据库由 `scan_library` 填充。
+>
+> 1. 登记：`register_library` → 若返回 `needsRootChoice = true`，用户选择后调 `select_library_root`。
+> 2. 扫描：源根确定后**必须**调用 `scan_library`（后台任务；进度走 `scan.progress`，终态走 `sync.completed`）。未扫描的库，`get_library` 永远返回空技能列表。
+> 3. 读取：`get_library` 返回矩阵数据。
+> 4. 日常刷新（F5、启动恢复上次库、同步完成后）：先 `scan_library` 再 `get_library`；`get_library` 本身不重扫磁盘。
+> 5. 预览与执行：`create_sync_plan` →（如有冲突）`resolve_conflict` → `execute_sync_plan` → 事件流 + `get_task_snapshot`。
+> 6. 单技能目录：`mode: 'auto'` 登记的目录本身含 SKILL.md 但其直接子目录都不是技能时，返回 `sourceRoot = null`；请用 `mode: 'single'` 重新登记该目录。
+
 ### 4.1 技能库
 
 #### `register_library` — 登记技能库（§10.4）
