@@ -1123,3 +1123,88 @@ fn ignore_patterns_exclude_and_shrink_managed_files() {
     );
     assert!(!item.excluded_by_ignore.is_empty(), "预览显示被排除文件");
 }
+
+// ---------------------------------------------------------------------------
+// 符号链接/目录联接目标（AC-25 + 用户真实案例：悬空联接导致 os error 5）
+// ---------------------------------------------------------------------------
+
+/// 在 Windows 上创建目录联接（mklink /j 无需管理员权限）。
+fn make_junction(link: &Path, target: &Path) -> bool {
+    std::process::Command::new("cmd")
+        .args(["/c", "mklink", "/j"])
+        .arg(link)
+        .arg(target)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+#[test]
+fn dangling_junction_at_target_is_blocked_not_permission_error() {
+    let env = Env::new();
+    env.write_skill("demo", "演示", &["x"]);
+    let lib = env.register_and_scan();
+    let pt = env.add_target();
+    let mapping = env.map_skill(&lib, "demo", &pt);
+
+    // 目标位置放一个「悬空目录联接」（指向不存在的目录）
+    std::fs::create_dir_all(&env.dst).unwrap();
+    let link = env.dst.join("demo");
+    let bogus = env.dst.join("不存在的位置-xyz");
+    if !make_junction(&link, &bogus) {
+        eprintln!("mklink 不可用，跳过该测试");
+        return;
+    }
+
+    // 计划：单项阻塞，原因清楚（而不是 os error 5 权限不足）
+    let plan = env.plan(&lib, std::slice::from_ref(&mapping));
+    let item = plan_item(&plan, "demo");
+    assert_eq!(item.action, PlanAction::Blocked, "悬空联接必须识别为阻塞项");
+    assert!(
+        item.blocked_reason.as_ref().unwrap().contains("符号链接/目录联接"),
+        "错误消息应说明真实原因，实际：{:?}",
+        item.blocked_reason
+    );
+
+    // 执行：不炸、不动链接（§8.5 不跟随不覆盖）
+    let task = env.execute(&plan);
+    let view = task_view(&env, &task);
+    assert_eq!(view.counts.failed, 0);
+    use std::os::windows::fs::MetadataExt;
+    let meta = std::fs::symlink_metadata(&link).unwrap();
+    assert!(meta.file_attributes() & 0x400 != 0, "联接保持原样");
+    // 没有残留事务目录
+    assert!(
+        skilldock_lib::fsops::sibling_transaction_root(&env.dst)
+            .read_dir()
+            .map(|mut d| d.next().is_none())
+            .unwrap_or(true)
+    );
+}
+
+#[test]
+fn valid_junction_at_target_is_blocked_not_followed() {
+    let env = Env::new();
+    env.write_skill("demo", "演示", &["源内容"]);
+    let lib = env.register_and_scan();
+    let pt = env.add_target();
+    let mapping = env.map_skill(&lib, "demo", &pt);
+
+    // 有效联接指向一个真实目录（内容不同）
+    let real = env._tmp.path().join("real-elsewhere");
+    std::fs::create_dir_all(&real).unwrap();
+    std::fs::write(real.join("SKILL.md"), "---\nname: demo\ndescription: 别处版本\n---\n").unwrap();
+    std::fs::create_dir_all(&env.dst).unwrap();
+    let link = env.dst.join("demo");
+    if !make_junction(&link, &real) {
+        eprintln!("mklink 不可用，跳过该测试");
+        return;
+    }
+
+    let plan = env.plan(&lib, std::slice::from_ref(&mapping));
+    let item = plan_item(&plan, "demo");
+    assert_eq!(item.action, PlanAction::Blocked, "有效联接也不跟随（§8.5）");
+    env.execute(&plan);
+    assert!(real.join("SKILL.md").exists(), "联接目标内容不被触碰");
+    assert!(!real.join("assets/file-0.txt").exists(), "不写入联接目标");
+}

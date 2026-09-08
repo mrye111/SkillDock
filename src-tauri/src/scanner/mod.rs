@@ -525,12 +525,24 @@ fn count_direct_skills(dir: &Path) -> u32 {
 // ---------------------------------------------------------------------------
 
 /// 计算一个目录的完整清单与摘要；目录不存在返回 None。
-/// 命中重解析点返回 Unsupported（§8.5：提交前检查）。
+/// 命中重解析点返回 Unsupported（§8.5：提交前检查；含悬空链接——`exists()` 会误判其为缺席）。
 pub fn digest_directory(dir: &Path) -> Result<Option<(String, Vec<FileEntry>)>, AppError> {
-    if !dir.exists() {
-        return Ok(None);
+    // symlink_metadata 不跟随链接：悬空符号链接/目录联接也能被识别
+    let meta = match std::fs::symlink_metadata(dir) {
+        Ok(m) => m,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(AppError::from(e)),
+    };
+    if windows_paths::is_reparse_point(&meta) {
+        return Err(AppError::new(
+            ErrorCode::Unsupported,
+            format!(
+                "目标是符号链接/目录联接，按规则不跟随、不改动；请确认后手动处理：{}",
+                dir.display()
+            ),
+        ));
     }
-    if !dir.is_dir() {
+    if !meta.is_dir() {
         return Err(AppError::invalid_path(format!(
             "目标位置已存在同名文件而非目录：{}",
             dir.display()

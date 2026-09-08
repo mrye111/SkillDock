@@ -45,7 +45,24 @@ impl BackupStore {
         target_path: &Path,
     ) -> AppResult<SnapshotRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let exists = target_path.exists();
+        // 用 symlink_metadata 判定存在性：悬空符号链接 exists() 会误判为不存在（§8.5 不跟随）
+        let meta = match std::fs::symlink_metadata(target_path) {
+            Ok(m) => Some(m),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(AppError::from(e)),
+        };
+        if let Some(m) = &meta {
+            if crate::windows_paths::is_reparse_point(m) {
+                return Err(AppError::new(
+                    ErrorCode::Unsupported,
+                    format!(
+                        "目标是符号链接/目录联接，不备份、不改动；请手动处理：{}",
+                        target_path.display()
+                    ),
+                ));
+            }
+        }
+        let exists = meta.is_some();
         if !exists {
             store
                 .insert_snapshot(&id, task_item_id, mapping_id, &target_path.to_string_lossy(), false, None, None, 0)

@@ -281,7 +281,21 @@ pub fn matrix_cells(
         for mapping in skill_mappings {
             let physical = store.get_physical_target(&mapping.physical_target_id)?;
             let target_dir = PathBuf::from(&physical.canonical_path).join(&mapping.target_dir_name);
-            let t_digest = scanner::digest_directory(&target_dir)?.map(|(d, _)| d);
+            // 目标读取失败（符号链接等）：单元格标记不支持，不拖垮整个矩阵
+            let target_scan = scanner::digest_directory(&target_dir);
+            if let Err(e) = target_scan {
+                cells.insert(
+                    mapping.physical_target_id.clone(),
+                    MatrixCell {
+                        state: MatrixCellState::Unsupported,
+                        mapping_id: Some(mapping.id.clone()),
+                        target_dir_name: Some(mapping.target_dir_name.clone()),
+                        detail: Some(e.message),
+                    },
+                );
+                continue;
+            }
+            let t_digest = target_scan.unwrap().map(|(d, _)| d);
             let baseline = store.get_baseline(&mapping.id)?;
             let managed = baseline.is_some();
             let b_digest = baseline.as_ref().and_then(|b| b.digest.clone());
@@ -445,9 +459,12 @@ fn plan_sync_item(
     let skill = store.get_skill(&mapping.skill_id)?;
     let (s_digest, s_manifest, live_status, excluded) =
         live_source(&skill, source_root, ignore)?;
-    let (t_digest, t_manifest) = scanner::digest_directory(target_dir)?
-        .map(|(d, m)| (Some(d), m))
-        .unwrap_or((None, Vec::new()));
+    // 目标端读取失败（如符号链接/目录联接）→ 单项阻塞，不拖垮整个预览（§7.2）
+    let (t_digest, t_manifest, target_blocked) = match scanner::digest_directory(target_dir) {
+        Ok(Some((d, m))) => (Some(d), m, None),
+        Ok(None) => (None, Vec::new(), None),
+        Err(e) => (None, Vec::new(), Some(e.message)),
+    };
     let baseline = store.get_baseline(&mapping.id)?;
     let managed = baseline.is_some();
     let b_digest: Option<&str> = baseline.as_ref().and_then(|b| b.digest.as_deref());
@@ -471,15 +488,22 @@ fn plan_sync_item(
         Some(d) => Content::Present(d),
         None => Content::Absent,
     };
-    let decision = decide(
-        managed,
-        source,
-        target,
-        baseline_c,
-        live_status,
-        paused,
-        ownership_conflict,
-    );
+    let decision = match &target_blocked {
+        Some(reason) => Decision {
+            state: MatrixCellState::Unsupported,
+            blocked_reason: Some(reason.clone()),
+            ..Decision::simple(MatrixCellState::Unsupported, PlanAction::Blocked, false)
+        },
+        None => decide(
+            managed,
+            source,
+            target,
+            baseline_c,
+            live_status,
+            paused,
+            ownership_conflict,
+        ),
+    };
 
     let file_changes = match decision.action {
         PlanAction::Create | PlanAction::Reinstall => {
@@ -529,9 +553,35 @@ fn plan_remove_item(
 ) -> AppResult<PlanItem> {
     let skill = store.get_skill(&mapping.skill_id)?;
     let baseline = store.get_baseline(&mapping.id)?;
-    let (t_digest, t_manifest) = scanner::digest_directory(target_dir)?
-        .map(|(d, m)| (Some(d), m))
-        .unwrap_or((None, Vec::new()));
+    // 目标读取失败（符号链接等）→ 阻塞移除，不在未知内容上动手
+    let (t_digest, t_manifest, read_blocked) = match scanner::digest_directory(target_dir) {
+        Ok(Some((d, m))) => (Some(d), m, None),
+        Ok(None) => (None, Vec::new(), None),
+        Err(e) => (None, Vec::new(), Some(e.message)),
+    };
+    if let Some(reason) = read_blocked {
+        return Ok(PlanItem {
+            item_id: uuid::Uuid::new_v4().to_string(),
+            mapping_id: mapping.id.clone(),
+            skill_id: skill.id.clone(),
+            skill_name: skill.name.clone().unwrap_or_else(|| mapping.target_dir_name.clone()),
+            rel_path: skill.rel_path.clone(),
+            action: PlanAction::Blocked,
+            file_changes: Vec::new(),
+            excluded_by_ignore: Vec::new(),
+            needs_backup: false,
+            target_path: target_dir.to_string_lossy().to_string(),
+            state_before: MatrixCellState::Unsupported,
+            conflict: None,
+            blocked_reason: Some(reason),
+            selected: false,
+            decision: None,
+            source_digest: None,
+            target_digest: None,
+            baseline_digest: baseline.map(|b| b.digest),
+            restore: None,
+        });
+    }
 
     let (action, selected, needs_backup, conflict, blocked_reason) = match (&baseline, &t_digest) {
         (None, _) => (
