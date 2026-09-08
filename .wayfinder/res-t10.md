@@ -7,4 +7,11 @@
 - 占位图标（品牌主色 #0F766E），正式图标待设计
 - 卸载默认保留用户数据：Tauri NSIS 模板默认行为即「勾选才删除」，不额外配置
 
-**剩余（本票保持开启）**：前端 `dist/` 就绪后联调 `npm run tauri build` 产出标准/离线 EXE；AC-28/29（安装/升级/卸载/离线）需干净虚拟机实测；正式图标替换。
+**最新进展（2026-09-08）**：
+- 前端生产构建 `npm run build` 就绪，TS 类型检查 0 错误；
+- 修复了 NSIS 语言配置（由 `zh-CN` 改为 NSIS 规范标识 `SimpChinese`）；
+- 成功执行 `npm run tauri build`，标准版 NSIS 安装程序已成功产出：
+  - 产物路径：`src-tauri/target/release/bundle/nsis/SkillDock_0.1.0_x64-setup.exe`（2.79 MB）；
+  - 独立运行程序：`src-tauri/target/release/skilldock.exe`。
+
+**剩余**：AC-28/29（虚拟机实机安装与升级测试）；离线安装包变体构建；正式图标替换。
