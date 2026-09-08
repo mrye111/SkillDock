@@ -33,17 +33,17 @@ pub static ADAPTERS: &[AdapterDef] = &[
     AdapterDef {
         id: "codex",
         display_name: "Codex",
-        docs_url: "https://learn.chatgpt.com/docs/build-skills",
+        docs_url: "https://developers.openai.com/codex/skills",
         scopes: &[TargetScope::User, TargetScope::Project],
-        user_template: Some("%USERPROFILE%\\.agents\\skills"),
-        project_template: Some("{PROJECT}\\.agents\\skills"),
-        also_read_by: &["Cursor 也会读取 .agents 下的兼容技能目录"],
+        user_template: Some("%USERPROFILE%\\.codex\\skills"),
+        project_template: Some("{PROJECT}\\.codex\\skills"),
+        also_read_by: &["Cursor 也会读取 .codex 下的兼容技能目录"],
         notes: &[
-            "旧路径 %USERPROFILE%\\.codex\\skills 需按当前版本确认，不自动双写或迁移",
-            "项目发现可能向仓库根逐级查找",
+            "用户级路径随 CODEX_HOME 环境变量变化（默认 ~/.codex）",
+            "已按本机 codex-cli 0.147.0 实测校正（二进制字符串验证）：用户级 $CODEX_HOME/skills、项目级 .codex/skills；部分在线文档写 .agents/skills，与本机实测不符，以客户端实测为准",
         ],
-        detect_hints: &["%USERPROFILE%\\.agents", "%USERPROFILE%\\.codex"],
-        env_override: None,
+        detect_hints: &["%USERPROFILE%\\.codex", "%USERPROFILE%\\.agents"],
+        env_override: Some("CODEX_HOME"),
     },
     AdapterDef {
         id: "claude_code",
@@ -355,7 +355,21 @@ mod tests {
             None,
         )
         .unwrap();
-        assert!(p.to_string_lossy().ends_with(r".agents\skills"));
+        assert!(p.to_string_lossy().ends_with(r".codex\skills"));
+    }
+
+    #[test]
+    fn codex_home_env_overrides_user_template() {
+        let def = find_adapter("codex").unwrap();
+        let saved = std::env::var("CODEX_HOME").ok();
+        std::env::set_var("CODEX_HOME", r"D:\custom-codex-home");
+        let (p, _, src) = resolve_adapter_path(def, TargetScope::User, None, None).unwrap();
+        match saved {
+            Some(v) => std::env::set_var("CODEX_HOME", v),
+            None => std::env::remove_var("CODEX_HOME"),
+        }
+        assert_eq!(p, Path::new(r"D:\custom-codex-home\skills"));
+        assert!(src.contains("CODEX_HOME"));
     }
 
     #[test]
