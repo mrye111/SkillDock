@@ -448,10 +448,11 @@ export interface SnapshotView {
 // 5. 事件
 // ---------------------------------------------------------------------------
 
-export const EVENT_SCAN_PROGRESS = 'scan.progress';
-export const EVENT_SYNC_PROGRESS = 'sync.progress';
-export const EVENT_SYNC_COMPLETED = 'sync.completed';
-export const EVENT_RECOVERY_REQUIRED = 'recovery.required';
+// 事件名：Tauri 2 只允许字母数字、'-'、'/'、':'、'_'（点号不合法，勿改回 scan.progress 形式）
+export const EVENT_SCAN_PROGRESS = 'scan://progress';
+export const EVENT_SYNC_PROGRESS = 'sync://progress';
+export const EVENT_SYNC_COMPLETED = 'sync://completed';
+export const EVENT_RECOVERY_REQUIRED = 'recovery://required';
 
 export interface ScanProgressEvent {
   taskId: string;

@@ -572,10 +572,11 @@ pub struct SnapshotView {
 // 5. 事件
 // ---------------------------------------------------------------------------
 
-pub const EVENT_SCAN_PROGRESS: &str = "scan.progress";
-pub const EVENT_SYNC_PROGRESS: &str = "sync.progress";
-pub const EVENT_SYNC_COMPLETED: &str = "sync.completed";
-pub const EVENT_RECOVERY_REQUIRED: &str = "recovery.required";
+// 事件名：Tauri 2 只允许字母数字、'-'、'/'、':'、'_'（点号不合法）
+pub const EVENT_SCAN_PROGRESS: &str = "scan://progress";
+pub const EVENT_SYNC_PROGRESS: &str = "sync://progress";
+pub const EVENT_SYNC_COMPLETED: &str = "sync://completed";
+pub const EVENT_RECOVERY_REQUIRED: &str = "recovery://required";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -624,4 +625,27 @@ pub struct RecoveryRequiredEvent {
     pub skill_name: Option<String>,
     pub reason: String,
     pub recoverable: String, // auto | manual
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tauri 2 事件名校验：只允许字母数字、'-'、'/'、':'、'_'
+    /// （点号曾在 v1.0 导致所有事件发送失败，回归测试）
+    #[test]
+    fn event_names_are_tauri_legal() {
+        for name in [
+            EVENT_SCAN_PROGRESS,
+            EVENT_SYNC_PROGRESS,
+            EVENT_SYNC_COMPLETED,
+            EVENT_RECOVERY_REQUIRED,
+        ] {
+            assert!(
+                name.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '/' | ':' | '_')),
+                "事件名 {name} 含 Tauri 不允许的字符"
+            );
+        }
+    }
 }

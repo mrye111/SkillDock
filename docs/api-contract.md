@@ -1,12 +1,13 @@
 # SkillDock 前后端接口约定（API Contract）
 
-文档版本：1.1 · 编写日期：2026-09-08 · 维护方：后端会话（src-tauri）
+文档版本：1.2 · 编写日期：2026-09-08 · 维护方：后端会话（src-tauri）
 配套文件：[`src/lib/backend-contract.ts`](../src/lib/backend-contract.ts)（前端 TypeScript 类型，与本文同步维护）
 
 > 接口有任何变化，后端会话必须先更新这两个文件并通知前端会话，再落地实现。
 > 权威需求依据：`docs/SkillDock-需求与技术设计.md` §10.4（命令表）、§7（功能细则）、§8（同步语义）、§11（数据存储）。
 
 **变更记录**
+- 1.2（2026-09-08）：事件名改为 `scan://progress` 等冒号形式——Tauri 2 事件名不允许点号（仅字母数字、- / : _）。前端订阅常量值不变（仍用 backend-contract.ts 导出的常量）。
 - 1.1（2026-09-08）：`ConflictInfo.kind` 新增 `same_content`（已有相同内容，可接管）与 `target_deleted`（目标已删除，可重装）；`ConflictChoice` 新增 `remove_with_backup`（移除计划中的「备份当前内容后移除」，§8.3）。均为新增枚举值，非破坏变更。
 - 1.0（2026-09-08）：首版。
 
@@ -145,7 +146,7 @@ type Availability = 'exists' | 'will_create' | 'no_permission' | 'invalid_path' 
 > **调用时序（前端必读）**：技能列表来自后端数据库，数据库由 `scan_library` 填充。
 >
 > 1. 登记：`register_library` → 若返回 `needsRootChoice = true`，用户选择后调 `select_library_root`。
-> 2. 扫描：源根确定后**必须**调用 `scan_library`（后台任务；进度走 `scan.progress`，终态走 `sync.completed`）。未扫描的库，`get_library` 永远返回空技能列表。
+> 2. 扫描：源根确定后**必须**调用 `scan_library`（后台任务；进度走 `scan://progress`，终态走 `sync://completed`）。未扫描的库，`get_library` 永远返回空技能列表。
 > 3. 读取：`get_library` 返回矩阵数据。
 > 4. 日常刷新（F5、启动恢复上次库、同步完成后）：先 `scan_library` 再 `get_library`；`get_library` 本身不重扫磁盘。
 > 5. 预览与执行：`create_sync_plan` →（如有冲突）`resolve_conflict` → `execute_sync_plan` → 事件流 + `get_task_snapshot`。
@@ -236,7 +237,7 @@ invoke<{ configVersion: number }>('update_library_settings', { libraryId, ignore
 
 ```ts
 invoke<{ taskId: string }>('scan_library', { libraryId })
-// 进度经 scan.progress 事件分批推送；完成后经 get_task_snapshot 或 get_library 取结果
+// 进度经 scan://progress 事件分批推送；完成后经 get_task_snapshot 或 get_library 取结果
 ```
 
 #### `get_library` — 库详情（矩阵数据源）
@@ -700,7 +701,7 @@ interface RecoveryRequiredEvent {
 }
 ```
 
-事件名常量：`scan.progress`、`sync.progress`、`sync.completed`、`recovery.required`。
+事件名常量：`scan://progress`、`sync://progress`、`sync://completed`、`recovery://required`。
 
 ---
 
