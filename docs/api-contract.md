@@ -1,12 +1,13 @@
 # SkillDock 前后端接口约定（API Contract）
 
-文档版本：1.2 · 编写日期：2026-09-08 · 维护方：后端会话（src-tauri）
+文档版本：1.3 · 编写日期：2026-09-08 · 维护方：后端会话（src-tauri）
 配套文件：[`src/lib/backend-contract.ts`](../src/lib/backend-contract.ts)（前端 TypeScript 类型，与本文同步维护）
 
 > 接口有任何变化，后端会话必须先更新这两个文件并通知前端会话，再落地实现。
 > 权威需求依据：`docs/SkillDock-需求与技术设计.md` §10.4（命令表）、§7（功能细则）、§8（同步语义）、§11（数据存储）。
 
 **变更记录**
+- 1.3（2026-09-08）：`SourceCandidate.origin` 新增 `codex_skills`（候选发现补充 .codex/skills 位置）。新增枚举值，非破坏变更。
 - 1.2（2026-09-08）：事件名改为 `scan://progress` 等冒号形式——Tauri 2 事件名不允许点号（仅字母数字、- / : _）。前端订阅常量值不变（仍用 backend-contract.ts 导出的常量）。
 - 1.1（2026-09-08）：`ConflictInfo.kind` 新增 `same_content`（已有相同内容，可接管）与 `target_deleted`（目标已删除，可重装）；`ConflictChoice` 新增 `remove_with_backup`（移除计划中的「备份当前内容后移除」，§8.3）。均为新增枚举值，非破坏变更。
 - 1.0（2026-09-08）：首版。
@@ -178,7 +179,7 @@ interface RegisterLibraryResult {
 
 interface SourceCandidate {
   path: string;                       // 候选源根绝对路径
-  origin: 'root' | 'skills' | 'agents_skills' | 'claude_skills' | 'custom';
+  origin: 'root' | 'skills' | 'agents_skills' | 'claude_skills' | 'codex_skills' | 'custom';
   validSkillCount: number;
   invalidSkillCount: number;
 }

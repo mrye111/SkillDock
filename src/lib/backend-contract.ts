@@ -133,7 +133,7 @@ export interface RegisterLibraryInput {
 
 export interface SourceCandidate {
   path: string;
-  origin: 'root' | 'skills' | 'agents_skills' | 'claude_skills' | 'custom';
+  origin: 'root' | 'skills' | 'agents_skills' | 'claude_skills' | 'codex_skills' | 'custom';
   validSkillCount: number;
   invalidSkillCount: number;
 }

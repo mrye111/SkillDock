@@ -469,6 +469,7 @@ const CANDIDATE_DIRS: &[(&str, &str)] = &[
     ("skills", "skills"),
     (".agents/skills", "agents_skills"),
     (".claude/skills", "claude_skills"),
+    (".codex/skills", "codex_skills"),
 ];
 
 /// 对所选目录做浅层候选发现：根目录、`skills/`、`.agents/skills/`、`.claude/skills/`。

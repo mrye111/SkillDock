@@ -1,6 +1,6 @@
 # SkillDock — Windows Skills 同步工具需求与技术设计
 
-文档版本：1.0 · 编写日期：2026-09-08 · 状态：开发需求基线
+文档版本：1.1 · 编写日期：2026-09-08 · 状态：开发需求基线（v1.1：Codex 技能目录按 codex-cli 0.147.0 实测校正为 .codex/skills，候选发现补充 .codex/skills）
 
 产品名称：**SkillDock**。产品标语：**一处维护，随处可用。**
 
@@ -128,7 +128,7 @@ my-project/
     └── meeting-notes/SKILL.md
 ```
 
-首次选择项目时，对根目录、`skills/`、`.agents/skills/`、`.claude/skills/` 等已知位置进行浅层候选发现。只有一个有效候选时自动填入并展示；多个候选时列出数量和路径供选择，不合并不同集合。用户也可直接指定任意源根目录。
+首次选择项目时，对根目录、`skills/`、`.agents/skills/`、`.claude/skills/`、`.codex/skills/` 等已知位置进行浅层候选发现。只有一个有效候选时自动填入并展示；多个候选时列出数量和路径供选择，不合并不同集合。用户也可直接指定任意源根目录。
 
 选定源根后，只将其直接子目录中的 `SKILL.md` 识别为 Skill。不递归把 references 中的示例技能当成独立项目。单个 Skill 文件夹可用“添加单个技能”模式登记，分发名为其合法目录名。
 
@@ -161,13 +161,13 @@ P0 设置页提供源库级忽略模式，沿用相对根路径的 glob 语义�
 
 | 首版适配器 | 用户级建议目录 | 项目级建议目录 | 边界与依据 |
 | --- | --- | --- | --- |
-| Codex | `<用户目录>/.agents/skills/` | `<目标项目>/.agents/skills/` | 当前文档使用 .agents；项目发现可能向仓库根逐级查找。[Codex Skills](https://learn.chatgpt.com/docs/build-skills) |
+| Codex | `<用户目录>/.codex/skills/` | `<目标项目>/.codex/skills/` | 用户级随 `CODEX_HOME` 环境变量变化（默认 `~/.codex`）；2026-09-08 按 codex-cli 0.147.0 本机实测校正（二进制字符串验证）；部分在线文档写 .agents/skills，与实测不符，以客户端实测为准。[Codex Skills](https://developers.openai.com/codex/skills) |
 | Claude Code | `<用户目录>/.claude/skills/` | `<目标项目>/.claude/skills/` | 自定义配置目录应考虑 CLAUDE_CONFIG_DIR；保留工具专有元数据。[Skills](https://code.claude.com/docs/en/skills)、[配置目录](https://code.claude.com/docs/en/claude-directory) |
 | Cursor | `<用户目录>/.cursor/skills/` | `<目标项目>/.cursor/skills/` | 还会读取 .agents、.claude、.codex 下的兼容技能目录；需识别重复发现。[Cursor Skills](https://prod.cursor.com/docs/skills) |
 | GitHub Copilot（VS Code） | `<用户目录>/.copilot/skills/` | `<目标项目>/.github/skills/` | VS Code 也支持用户/项目 .claude 与 .agents 技能目录，并允许配置附加项目位置。[VS Code Agent Skills](https://code.visualstudio.com/docs/agent-customization/agent-skills) |
 | 自定义目录 | 用户自行选择 | 用户自行选择 | 将所选目录视为技能集合根，不推断 Agent 的加载规则 |
 
-Codex 的 `.codex/skills/` 可作为已有安装的旧路径候选，标记“需按当前版本确认”，不自动与 `.agents/skills/` 双写或迁移。本地发现某个目录存在不能取代版本验证。P0 不管理企业策略目录、Agent 内置技能或插件缓存目录。
+Codex 的技能目录按实测客户端版本锁定（当前实测：codex-cli 0.147.0 读取 `$CODEX_HOME/skills` 与项目级 `.codex/skills`）；`.agents/skills/` 仅作为可能的历史/文档差异候选展示，不自动双写或迁移。本地发现某个目录存在不能取代版本验证。P0 不管理企业策略目录、Agent 内置技能或插件缓存目录。
 
 Copilot 首版验收限定 Windows 桌面 VS Code 的相关 Agent 功能，不把 Copilot CLI、GitHub 网页端或云端 Agent 自动列为已验证。其他客户端后续作为独立适配器扩展。
 
