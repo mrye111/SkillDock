@@ -1,0 +1,82 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        ink: '#0f172a',
+        muted: '#475569',
+        soft: '#64748b',
+        'clear-blue': '#2563eb',
+        'clear-blue-deep': '#1d4ed8',
+        'clear-blue-tint': '#eff6ff',
+        'clear-green': '#16a34a',
+        'clear-orange': '#d97706',
+        'clear-red': '#dc2626',
+        surface: {
+          bg: '#f8fafc',
+          panel: '#ffffff',
+          hover: '#f1f5f9',
+          subtle: '#f8fafc',
+        },
+        content: {
+          primary: '#0f172a',
+          secondary: '#334155',
+          muted: '#475569',
+          inverted: '#ffffff',
+        },
+        border: {
+          subtle: '#e2e8f0',
+          strong: '#cbd5e1',
+        },
+        primary: {
+          DEFAULT: '#2563eb',
+          hover: '#1d4ed8',
+          active: '#1e40af',
+          light: '#eff6ff',
+          subtle: '#f8fafc',
+        },
+        status: {
+          success: '#16a34a',
+          'success-bg': '#f0fdf4',
+          'success-border': '#bbf7d0',
+          warning: '#d97706',
+          'warning-bg': '#fffbeb',
+          'warning-border': '#fde68a',
+          danger: '#dc2626',
+          'danger-bg': '#fef2f2',
+          'danger-border': '#fecaca',
+          info: '#2563eb',
+          'info-bg': '#eff6ff',
+          'info-border': '#bfdbfe',
+          neutral: '#64748b',
+          'neutral-bg': '#f1f5f9',
+          'neutral-border': '#cbd5e1',
+        },
+      },
+      fontFamily: {
+        sans: [
+          '"Segoe UI Variable Text"',
+          '"Segoe UI"',
+          '"Microsoft YaHei UI"',
+          '"Microsoft YaHei"',
+          'system-ui',
+          '-apple-system',
+          'sans-serif',
+        ],
+        mono: [
+          '"Cascadia Code"',
+          '"Cascadia Mono"',
+          'Consolas',
+          'monospace',
+        ],
+      },
+      borderRadius: {
+        lg: '8px',
+        xl: '12px',
+        '2xl': '17px',
+      },
+    },
+  },
+  plugins: [],
+};
