@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="360" viewBox="0 0 1200 360"
+     role="img" aria-labelledby="title desc">
+  <title id="title">SkillDock 工作原理</title>
+  <desc id="desc">从扫描校验到事务执行的完整链路：扫描 → 预览计划 → 事务执行 → 基线与备份 → 可恢复。</desc>
+
+  <rect width="1200" height="360" rx="26" fill="#F7F9FA" stroke="#DFE7EA" stroke-width="2"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei UI', sans-serif">
+    <!-- 流程节点 -->
+    <!-- 1 扫描与校验 -->
+    <g transform="translate(48 64)">
+      <rect width="196" height="150" rx="14" fill="#FFFFFF" stroke="#DFE7EA" stroke-width="2"/>
+      <rect x="18" y="18" width="40" height="40" rx="10" fill="#E6F4F1"/>
+      <circle cx="31" cy="36" r="9" fill="none" stroke="#0F766E" stroke-width="3"/>
+      <path d="M 38 43 l 8 8" stroke="#0F766E" stroke-width="3" stroke-linecap="round"/>
+      <text x="18" y="86" font-size="21" font-weight="600" fill="#172B36">扫描与校验</text>
+      <text x="18" y="114" font-size="16" fill="#546772">SKILL.md 元数据、</text>
+      <text x="18" y="136" font-size="16" fill="#546772">SHA-256 内容摘要</text>
+    </g>
+    <!-- 2 预览计划 -->
+    <g transform="translate(288 64)">
+      <rect width="196" height="150" rx="14" fill="#FFFFFF" stroke="#DFE7EA" stroke-width="2"/>
+      <rect x="18" y="18" width="40" height="40" rx="10" fill="#E6F4F1"/>
+      <rect x="26" y="26" width="24" height="6" rx="3" fill="#0F766E"/>
+      <rect x="26" y="36" width="24" height="6" rx="3" fill="#0F766E" fill-opacity="0.55"/>
+      <rect x="26" y="46" width="14" height="6" rx="3" fill="#0F766E" fill-opacity="0.3"/>
+      <text x="18" y="86" font-size="21" font-weight="600" fill="#172B36">预览计划</text>
+      <text x="18" y="114" font-size="16" fill="#546772">新增/更新/冲突/跳过</text>
+      <text x="18" y="136" font-size="16" fill="#546772">逐项可见，指纹失效</text>
+    </g>
+    <!-- 3 事务执行 -->
+    <g transform="translate(528 64)">
+      <rect width="196" height="150" rx="14" fill="#FFFFFF" stroke="#0F766E" stroke-width="2.5"/>
+      <rect x="18" y="18" width="40" height="40" rx="10" fill="#0F766E"/>
+      <path d="M 30 44 l 8 -16 l 8 16 z" fill="#FFFFFF"/>
+      <rect x="36" y="40" width="4" height="10" fill="#FFFFFF"/>
+      <text x="18" y="86" font-size="21" font-weight="600" fill="#172B36">事务执行</text>
+      <text x="18" y="114" font-size="16" fill="#546772">同卷暂存 → 备份 →</text>
+      <text x="18" y="136" font-size="16" fill="#546772">复核 → 改名替换提交</text>
+    </g>
+    <!-- 4 基线与备份 -->
+    <g transform="translate(768 64)">
+      <rect width="196" height="150" rx="14" fill="#FFFFFF" stroke="#DFE7EA" stroke-width="2"/>
+      <rect x="18" y="18" width="40" height="40" rx="10" fill="#E6F4F1"/>
+      <rect x="26" y="24" width="24" height="28" rx="4" fill="none" stroke="#0F766E" stroke-width="3"/>
+      <path d="M 32 38 l 4 4 l 8 -8" stroke="#0F766E" stroke-width="3" fill="none"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="18" y="86" font-size="21" font-weight="600" fill="#172B36">基线与备份</text>
+      <text x="18" y="114" font-size="16" fill="#546772">修改前可验证快照，</text>
+      <text x="18" y="136" font-size="16" fill="#546772">30 天 / 2 GiB 保留</text>
+    </g>
+    <!-- 5 恢复 -->
+    <g transform="translate(1008 64)">
+      <rect width="148" height="150" rx="14" fill="#FFFFFF" stroke="#DFE7EA" stroke-width="2"/>
+      <rect x="18" y="18" width="40" height="40" rx="10" fill="#E6F4F1"/>
+      <path d="M 46 30 a 12 12 0 1 0 2 10" fill="none" stroke="#0F766E" stroke-width="3"
+            stroke-linecap="round"/>
+      <path d="M 48 22 l -2 9 l -9 -2" fill="none" stroke="#0F766E" stroke-width="3"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="18" y="86" font-size="21" font-weight="600" fill="#172B36">恢复</text>
+      <text x="18" y="114" font-size="16" fill="#546772">历史回滚 +</text>
+      <text x="18" y="136" font-size="16" fill="#546772">崩溃自愈</text>
+    </g>
+
+    <!-- 连接箭头 -->
+    <g stroke="#0F766E" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 248 139 h 36 m -10 -8 l 10 8 l -10 8"/>
+      <path d="M 488 139 h 36 m -10 -8 l 10 8 l -10 8"/>
+      <path d="M 728 139 h 36 m -10 -8 l 10 8 l -10 8"/>
+      <path d="M 968 139 h 36 m -10 -8 l 10 8 l -10 8"/>
+    </g>
+  </g>
+
+  <!-- 底部铁律条 -->
+  <g transform="translate(48 262)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei UI', sans-serif">
+    <rect width="1108" height="56" rx="14" fill="#E6F4F1"/>
+    <text x="554" y="35" text-anchor="middle" font-size="20" font-weight="600" fill="#0F766E">四条铁律：不静默覆盖非托管内容 · 不自动删除源已移除的技能 · 预览后变化必须重生成计划 · 备份失败不得继续覆盖</text>
+  </g>
+</svg>
