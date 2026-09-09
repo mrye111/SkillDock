@@ -120,7 +120,7 @@ impl<'a> Runner<'a> {
         plan_id: &str,
         plan_version: i64,
         task_id: &str,
-        _trigger: TaskTrigger,
+        trigger: TaskTrigger,
         cancel: Arc<AtomicBool>,
     ) -> AppResult<()> {
         let started = std::time::Instant::now();
@@ -151,6 +151,43 @@ impl<'a> Runner<'a> {
             self.store.set_task_counts(task_id, &counts)?;
             self.store.set_task_error(task_id, err)?;
             self.store.update_task_status(task_id, status)?;
+            // 收拢 WAL，缩小崩溃损失窗口
+            self.store.checkpoint();
+            // 追加人类可读操作日志到「文档\SkillDock」（独立于数据库存续）
+            let task = self.store.get_task(task_id).ok();
+            let library_name = task
+                .as_ref()
+                .and_then(|t| t.library_id.as_deref())
+                .and_then(|id| self.store.get_library(id).ok())
+                .map(|l| l.display_name);
+            crate::oplog::append(&crate::oplog::OpLogEntry {
+                time: crate::storage::now_iso(),
+                task_id: task_id.to_string(),
+                kind: task
+                    .as_ref()
+                    .and_then(|t| {
+                        serde_json::to_value(t.kind).ok()?.as_str().map(String::from)
+                    })
+                    .unwrap_or_else(|| "sync".into()),
+                trigger: serde_json::to_value(trigger)
+                    .ok()
+                    .and_then(|v| v.as_str().map(String::from))
+                    .unwrap_or_else(|| "manual".into()),
+                status: status.as_str().to_string(),
+                library: library_name,
+                duration_ms: Some(started.elapsed().as_millis() as u64),
+                counts: counts.clone(),
+                items: items
+                    .iter()
+                    .map(|i| crate::oplog::OpLogItem {
+                        skill_name: i.skill_name.clone(),
+                        action: format!("{:?}", i.action),
+                        status: i.status.as_str().to_string(),
+                        target_path: i.target_path.clone(),
+                        error: i.error.as_ref().map(|e| e.message.clone()),
+                    })
+                    .collect(),
+            });
             self.sink.emit_json(
                 EVENT_SYNC_COMPLETED,
                 serde_json::to_value(SyncCompletedEvent {

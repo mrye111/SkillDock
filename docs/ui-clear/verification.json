@@ -1,0 +1,18 @@
+{
+  "passed": 11,
+  "checks": [
+    "Four configured destinations; no unsupported target toggles.",
+    "Ignore rules and backup policy save independently through existing commands.",
+    "Matrix status filters and name/description search work.",
+    "Plan has four executable mappings and one skipped mapping; no unsupported plan selection editing.",
+    "Simulated progress finishes with success and skipped counts separated.",
+    "Conflict choices update plan version and keep-target performs no write.",
+    "History exposes available snapshots and creates a restore plan before execution.",
+    "Custom destination creation uses save_target with custom name and path.",
+    "New library follows register -> scan -> get, with a real empty-state design.",
+    "1100 px window contains the layout; matrix scroll remains inside its panel.",
+    "Reduced-motion preference disables spatial animations."
+  ],
+  "pageErrors": [],
+  "verifiedAt": "2026-09-08T06:12:01.442Z"
+}

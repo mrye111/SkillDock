@@ -7,6 +7,7 @@ pub mod contract;
 pub mod error;
 pub mod executor;
 pub mod fsops;
+pub mod oplog;
 pub mod planner;
 pub mod recovery;
 pub mod scanner;
@@ -89,6 +90,7 @@ pub fn run() {
             commands::update_mappings,
             commands::create_sync_plan,
             commands::resolve_conflict,
+            commands::resolve_conflicts_bulk,
             commands::execute_sync_plan,
             commands::cancel_task,
             commands::get_task_snapshot,
@@ -101,6 +103,15 @@ pub fn run() {
             commands::update_backup_settings,
             commands::open_registered_path,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running SkillDock");
+        .build(tauri::generate_context!())
+        .expect("error while building SkillDock")
+        .run(|app_handle, event| {
+            // 退出时收拢 WAL，保证数据落主文件（崩溃/重装不丢最近操作）
+            if let tauri::RunEvent::Exit = event {
+                use tauri::Manager;
+                if let Some(state) = app_handle.try_state::<Arc<state::AppState>>() {
+                    state.store.checkpoint();
+                }
+            }
+        });
 }

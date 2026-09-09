@@ -1208,3 +1208,81 @@ fn valid_junction_at_target_is_blocked_not_followed() {
     assert!(real.join("SKILL.md").exists(), "联接目标内容不被触碰");
     assert!(!real.join("assets/file-0.txt").exists(), "不写入联接目标");
 }
+
+// ---------------------------------------------------------------------------
+// 批量冲突解决（resolve_conflicts_bulk）
+// ---------------------------------------------------------------------------
+
+#[test]
+fn bulk_adopt_same_content_and_take_over_others() {
+    let env = Env::new();
+    env.write_skill("same-a", "A", &["内容A"]);
+    env.write_skill("same-b", "B", &["内容B"]);
+    env.write_skill("diff-c", "C", &["源版本C"]);
+    let lib = env.register_and_scan();
+    let pt = env.add_target();
+
+    // 目标：same-a/same-b 与源逐字节一致；diff-c 内容不同
+    std::fs::create_dir_all(&env.dst).unwrap();
+    skilldock_lib::fsops::copy_tree(&env.src.join("same-a"), &env.dst.join("same-a")).unwrap();
+    skilldock_lib::fsops::copy_tree(&env.src.join("same-b"), &env.dst.join("same-b")).unwrap();
+    std::fs::create_dir_all(env.dst.join("diff-c")).unwrap();
+    std::fs::write(
+        env.dst.join("diff-c").join("SKILL.md"),
+        "---\nname: diff-c\ndescription: 别处旧版\n---\n",
+    )
+    .unwrap();
+
+    let m_a = env.map_skill(&lib, "same-a", &pt);
+    let m_b = env.map_skill(&lib, "same-b", &pt);
+    let m_c = env.map_skill(&lib, "diff-c", &pt);
+    let plan = env.plan(&lib, &[m_a.clone(), m_b.clone(), m_c.clone()]);
+    assert_eq!(plan_item(&plan, "same-a").state_before, MatrixCellState::SameContentUnmanaged);
+    assert_eq!(plan_item(&plan, "diff-c").state_before, MatrixCellState::UnmanagedConflict);
+
+    // 批量接管相同内容：kinds=['same_content'] + adopt_existing
+    let (plan, outcome) = planner::resolve_conflicts_bulk(
+        &env.store, &plan.plan_id, plan.plan_version,
+        &["same_content".to_string()], ConflictChoice::AdoptExisting,
+    )
+    .unwrap();
+    assert_eq!(outcome.applied.len(), 2);
+    assert!(outcome.skipped.is_empty());
+    assert_eq!(plan_item(&plan, "same-a").action, PlanAction::Adopt);
+    assert_eq!(plan_item(&plan, "same-b").action, PlanAction::Adopt);
+    // 内容不同的 diff-c 不受影响
+    assert!(plan_item(&plan, "diff-c").conflict.is_some());
+
+    // 执行：接管只建基线，不写文件
+    env.execute(&plan);
+    assert!(env.store.get_baseline(&m_a).unwrap().is_some());
+    assert!(env.store.get_baseline(&m_b).unwrap().is_some());
+    assert!(env.store.get_baseline(&m_c).unwrap().is_none());
+
+    // 批量接管不同内容：take_over（先备份后覆盖）
+    let plan2 = env.plan(&lib, std::slice::from_ref(&m_c));
+    let (plan2, outcome2) = planner::resolve_conflicts_bulk(
+        &env.store, &plan2.plan_id, plan2.plan_version,
+        &["unmanaged_same_name".to_string()], ConflictChoice::TakeOver,
+    )
+    .unwrap();
+    assert_eq!(outcome2.applied.len(), 1);
+    assert_eq!(plan_item(&plan2, "diff-c").action, PlanAction::TakeOver);
+    env.execute(&plan2);
+    assert_eq!(
+        env.digest_of(&env.src.join("diff-c")),
+        env.digest_of(&env.target_skill_dir("diff-c")),
+        "接管后目标与源一致"
+    );
+    let snaps = env.store.list_snapshots(Some(&m_c)).unwrap();
+    assert!(snaps.iter().any(|s| s.existed_before), "接管前已备份");
+
+    // 类型不匹配时不误伤
+    let plan3 = env.plan(&lib, std::slice::from_ref(&m_c));
+    let (_, outcome3) = planner::resolve_conflicts_bulk(
+        &env.store, &plan3.plan_id, plan3.plan_version,
+        &["same_content".to_string()], ConflictChoice::AdoptExisting,
+    )
+    .unwrap();
+    assert!(outcome3.applied.is_empty() && outcome3.skipped.is_empty(), "无匹配项时空结果");
+}

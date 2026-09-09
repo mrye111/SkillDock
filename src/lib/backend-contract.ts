@@ -1,7 +1,7 @@
 /**
  * SkillDock 前后端接口契约 —— TypeScript 类型（前端专用）
  *
- * 版本：1.1 · 2026-09-08 · 维护方：后端会话
+ * 版本：1.4 · 2026-09-09 · 维护方：后端会话
  * 权威文档：docs/api-contract.md（语义以该文档为准，二者同步维护）
  *
  * 约定：
@@ -354,6 +354,11 @@ export interface SyncPlanView {
   summary: PlanSummary;
 }
 
+export interface BulkResolveOutcome {
+  applied: string[];
+  skipped: string[];
+}
+
 export interface TaskCounts {
   success: number;
   failed: number;
@@ -539,6 +544,15 @@ export interface ContractCommands {
     args: { planId: string; planVersion: number; itemId: string; choice: ConflictChoice };
     result: SyncPlanView;
   };
+  resolve_conflicts_bulk: {
+    args: {
+      planId: string;
+      planVersion: number;
+      kinds: ConflictInfo['kind'][];
+      choice: ConflictChoice;
+    };
+    result: { plan: SyncPlanView; outcome: BulkResolveOutcome };
+  };
   execute_sync_plan: {
     args: { planId: string; planVersion: number };
     result: { taskId: string };
@@ -561,7 +575,7 @@ export interface ContractCommands {
   };
 
   open_registered_path: {
-    args: { kind: 'library' | 'target' | 'task_item' | 'snapshot'; id: string };
+    args: { kind: 'library' | 'target' | 'task_item' | 'snapshot' | 'log_dir'; id: string };
     result: null;
   };
 }

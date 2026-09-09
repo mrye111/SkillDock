@@ -1,6 +1,6 @@
 # SkillDock — Windows Skills 同步工具需求与技术设计
 
-文档版本：1.2 · 编写日期：2026-09-08 · 状态：开发需求基线（v1.1：Codex 技能目录按 codex-cli 0.147.0 实测校正为 .codex/skills；v1.2：默认安装位置按 Tauri NSIS 实测更正为 %LOCALAPPDATA%/SkillDock）
+文档版本：1.3 · 编写日期：2026-09-08 · 状态：开发需求基线（v1.1：Codex 技能目录按 codex-cli 0.147.0 实测校正为 .codex/skills；v1.2：默认安装位置按 Tauri NSIS 实测更正为 %LOCALAPPDATA%/SkillDock；v1.3：新增文档目录操作日志（SkillDock-操作日志.jsonl）与数据库启动自愈（完整性检查 + REINDEX + 不可修复时隔离重建）要求）
 
 产品名称：**SkillDock**。产品标语：**一处维护，随处可用。**
 
@@ -604,6 +604,8 @@ skilldock/
 ├── logs/
 └── cache/
 ```
+
+另设独立于数据库的长期可读操作记录：每个任务完成时向 `%USERPROFILE%/Documents/SkillDock/SkillDock-操作日志.jsonl`（文档目录，跟随系统重定向）追加一行 JSON（时间、任务、状态、计数、逐项结果）。数据库损坏或重装不影响该文件；文档目录若被 OneDrive 等同步，仅追加的单行日志无并发写风险。
 
 数据库记录映射归属，不向用户的技能文件夹注入管理标记。数据库丢失或首次在新电脑使用时，既有目标一律按非托管目录处理；不根据同名猜测拥有权。
 

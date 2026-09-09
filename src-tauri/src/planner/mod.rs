@@ -774,10 +774,79 @@ pub fn resolve_conflict(
         return Err(AppError::new(ErrorCode::PlanStale, "计划已失效，请重新生成预览"));
     }
     let mut items = plan.items.clone();
-    let item = items
-        .iter_mut()
-        .find(|i| i.item_id == item_id)
-        .ok_or_else(|| AppError::not_found("计划项", item_id))?;
+    {
+        let item = items
+            .iter_mut()
+            .find(|i| i.item_id == item_id)
+            .ok_or_else(|| AppError::not_found("计划项", item_id))?;
+        apply_choice(store, &plan, item, choice)?;
+    }
+    let fingerprint = compute_fingerprint(plan.config_version, plan.operation, &items);
+    store.update_plan_items(plan_id, &items, &fingerprint)?;
+    let row = store.get_plan(plan_id)?;
+    store.plan_view(&row)
+}
+
+/// 批量冲突解决（§6.3）：对指定冲突类型的所有未决项应用同一选择。
+/// 只处理「该选择在其 availableChoices 中」的项；其余跳过并计数返回。
+/// 整批一次版本递增（不是逐项递增），指纹一次重算。
+pub fn resolve_conflicts_bulk(
+    store: &Store,
+    plan_id: &str,
+    plan_version: i64,
+    kinds: &[String],
+    choice: ConflictChoice,
+) -> AppResult<(SyncPlan, BulkResolveOutcome)> {
+    let plan = store.get_plan(plan_id)?;
+    if plan.version != plan_version {
+        return Err(AppError::new(
+            ErrorCode::PlanStale,
+            "计划版本不匹配：他处已修改该计划，请刷新",
+        ));
+    }
+    if plan.status != PlanStatus::Active {
+        return Err(AppError::new(ErrorCode::PlanStale, "计划已失效，请重新生成预览"));
+    }
+    let mut items = plan.items.clone();
+    let mut applied: Vec<String> = Vec::new();
+    let mut skipped: Vec<String> = Vec::new();
+    for item in items.iter_mut() {
+        let Some(conflict) = item.conflict.clone() else {
+            continue;
+        };
+        if !kinds.contains(&conflict.kind) {
+            continue;
+        }
+        if !conflict.available_choices.contains(&choice) {
+            skipped.push(item.item_id.clone());
+            continue;
+        }
+        apply_choice(store, &plan, item, choice)?;
+        applied.push(item.item_id.clone());
+    }
+    if !applied.is_empty() {
+        let fingerprint = compute_fingerprint(plan.config_version, plan.operation, &items);
+        store.update_plan_items(plan_id, &items, &fingerprint)?;
+    }
+    let row = store.get_plan(plan_id)?;
+    let view = store.plan_view(&row)?;
+    Ok((view, BulkResolveOutcome { applied, skipped }))
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkResolveOutcome {
+    pub applied: Vec<String>,
+    pub skipped: Vec<String>,
+}
+
+/// 把单个冲突选择落到计划项上（单项与批量共用的核心转移逻辑）。
+fn apply_choice(
+    store: &Store,
+    plan: &PlanRow,
+    item: &mut PlanItem,
+    choice: ConflictChoice,
+) -> AppResult<()> {
     let conflict = item.conflict.clone().ok_or_else(|| {
         AppError::new(ErrorCode::ValidationFailed, "该计划项没有待处理的冲突")
     })?;
@@ -854,10 +923,7 @@ pub fn resolve_conflict(
         );
         item.source_digest = s_digest;
     }
-    let fingerprint = compute_fingerprint(plan.config_version, plan.operation, &items);
-    store.update_plan_items(plan_id, &items, &fingerprint)?;
-    let row = store.get_plan(plan_id)?;
-    store.plan_view(&row)
+    Ok(())
 }
 
 #[cfg(test)]

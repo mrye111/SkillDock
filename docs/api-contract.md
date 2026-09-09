@@ -1,12 +1,13 @@
 # SkillDock 前后端接口约定（API Contract）
 
-文档版本：1.3 · 编写日期：2026-09-08 · 维护方：后端会话（src-tauri）
+文档版本：1.4 · 编写日期：2026-09-08 · 维护方：后端会话（src-tauri）
 配套文件：[`src/lib/backend-contract.ts`](../src/lib/backend-contract.ts)（前端 TypeScript 类型，与本文同步维护）
 
 > 接口有任何变化，后端会话必须先更新这两个文件并通知前端会话，再落地实现。
 > 权威需求依据：`docs/SkillDock-需求与技术设计.md` §10.4（命令表）、§7（功能细则）、§8（同步语义）、§11（数据存储）。
 
 **变更记录**
+- 1.4（2026-09-09）：新增 `resolve_conflicts_bulk`（批量冲突解决，单次版本递增）；`open_registered_path` 的 kind 新增 `log_dir`；操作日志落盘到「文档\SkillDock\SkillDock-操作日志.jsonl」（append-only JSONL，见 §4.4 末注）。
 - 1.3（2026-09-08）：`SourceCandidate.origin` 新增 `codex_skills`（候选发现补充 .codex/skills 位置）。新增枚举值，非破坏变更。
 - 1.2（2026-09-08）：事件名改为 `scan://progress` 等冒号形式——Tauri 2 事件名不允许点号（仅字母数字、- / : _）。前端订阅常量值不变（仍用 backend-contract.ts 导出的常量）。
 - 1.1（2026-09-08）：`ConflictInfo.kind` 新增 `same_content`（已有相同内容，可接管）与 `target_deleted`（目标已删除，可重装）；`ConflictChoice` 新增 `remove_with_backup`（移除计划中的「备份当前内容后移除」，§8.3）。均为新增枚举值，非破坏变更。
@@ -486,6 +487,22 @@ invoke<SyncPlanView>('resolve_conflict', { planId, planVersion, itemId, choice }
 // 「接管/覆盖/转移归属」只对当前内容与当前计划有效（§8.2）
 ```
 
+#### `resolve_conflicts_bulk` — 批量冲突解决（§6.3 批量场景）
+
+```ts
+invoke<{ plan: SyncPlanView; outcome: BulkResolveOutcome }>('resolve_conflicts_bulk', {
+  planId, planVersion, kinds, choice,
+})
+// kinds：要批量处理的 ConflictInfo.kind 列表，如 ['same_content'] 或 ['unmanaged_same_name']
+// choice：对这些项统一应用的选择；某项的 availableChoices 不含该选择时跳过（计入 skipped）
+// 整批只递增一次 planVersion；kinds 匹配但无可执行项时 applied 为空数组
+
+interface BulkResolveOutcome {
+  applied: string[];   // 已应用的 itemId
+  skipped: string[];   // 类型匹配但选择不适用的 itemId
+}
+```
+
 #### `execute_sync_plan` — 执行（§10.4、§7.3）
 
 ```ts
@@ -605,6 +622,8 @@ interface CreateRestorePlanInput {
 
 恢复计划同样经 `execute_sync_plan` 执行，走 §8.4 事务流程。
 
+> **操作日志（独立于数据库）**：每个任务（扫描/同步/移除/恢复）完成时，后端向「文档\SkillDock\SkillDock-操作日志.jsonl」追加一行 JSON（时间、任务、状态、计数、逐项结果）。该文件是给用户的长期可读记录，数据库损坏或重装不受影响；前端可在设置页提供「打开日志目录」入口（`open_registered_path` kind = `log_dir`）。
+
 #### `get_backup_stats` / `list_snapshots`
 
 ```ts
@@ -648,7 +667,7 @@ invoke<BackupStats>('update_backup_settings', { retentionDays?, softCapBytes? })
 
 ```ts
 invoke<null>('open_registered_path', { kind, id })
-// kind: 'library' | 'target' | 'task_item' | 'snapshot'
+// kind: 'library' | 'target' | 'task_item' | 'snapshot' | 'log_dir'（打开操作日志目录，id 传空串）
 // 仅打开后端登记过的真实路径（经 Windows 文件管理器，不拼接 Shell 命令）；
 // 路径失效返回结构化错误（invalid_path / not_found）
 ```

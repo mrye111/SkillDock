@@ -326,6 +326,18 @@ fn scan_task_body(
             };
             state.store.set_task_counts(&task_id, &counts)?;
             state.store.update_task_status(&task_id, TaskStatus::Completed)?;
+            state.store.checkpoint();
+            crate::oplog::append(&crate::oplog::OpLogEntry {
+                time: crate::storage::now_iso(),
+                task_id: task_id.clone(),
+                kind: "scan".into(),
+                trigger: "manual".into(),
+                status: "completed".into(),
+                library: Some(lib.display_name.clone()),
+                duration_ms: Some(started.elapsed().as_millis() as u64),
+                counts: counts.clone(),
+                items: Vec::new(),
+            });
             sink.emit_json(
                 EVENT_SYNC_COMPLETED,
                 serde_json::to_value(SyncCompletedEvent {
@@ -649,6 +661,24 @@ pub fn resolve_conflict(
     planner::resolve_conflict(&state.store, &plan_id, plan_version, &item_id, choice)
 }
 
+/// 批量冲突解决：对指定冲突类型的未决项应用同一选择（§6.3）。
+/// 返回值带 `outcome`（applied/skipped 明细）；计划版本只递增一次。
+#[tauri::command]
+pub fn resolve_conflicts_bulk(
+    state: St,
+    plan_id: String,
+    plan_version: i64,
+    kinds: Vec<String>,
+    choice: ConflictChoice,
+) -> AppResult<serde_json::Value> {
+    let (plan, outcome) =
+        planner::resolve_conflicts_bulk(&state.store, &plan_id, plan_version, &kinds, choice)?;
+    Ok(serde_json::json!({
+        "plan": plan,
+        "outcome": outcome,
+    }))
+}
+
 #[tauri::command]
 pub fn execute_sync_plan(
     state: St,
@@ -865,6 +895,10 @@ pub fn open_registered_path(state: St, kind: String, id: String) -> AppResult<()
                 None => s.target_path,
             }
         }
+        // 操作日志目录（文档\SkillDock）；id 忽略，传空串即可
+        "log_dir" => crate::oplog::ops_log_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .ok_or_else(|| AppError::invalid_path("无法定位文档目录"))?,
         _ => {
             return Err(AppError::new(
                 ErrorCode::ValidationFailed,
@@ -873,6 +907,10 @@ pub fn open_registered_path(state: St, kind: String, id: String) -> AppResult<()
         }
     };
     let p = PathBuf::from(&path);
+    // 日志目录可能尚未生成：打开前先创建
+    if kind == "log_dir" && !p.exists() {
+        std::fs::create_dir_all(&p).map_err(AppError::from)?;
+    }
     if !p.exists() {
         return Err(AppError::new(
             ErrorCode::InvalidPath,

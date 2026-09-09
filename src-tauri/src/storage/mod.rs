@@ -201,13 +201,28 @@ pub fn parse_dt_pub(s: &str) -> chrono::DateTime<chrono::Utc> {
 }
 
 impl Store {
-    /// 打开（必要时创建）数据库并执行迁移；迁移失败时从备份恢复（§11.2）。
+    /// 打开（必要时创建）数据库。
+    /// 顺序：完整性自愈 → 有待迁移时才备份（先收拢 WAL）→ 迁移 → 打开。
+    /// 数据库损坏不可修复时隔离重建：既有目标一律按非托管处理（§11.2）。
     pub fn open(data_dir: &Path) -> AppResult<Self> {
         std::fs::create_dir_all(data_dir).map_err(AppError::from)?;
         let db_path = data_dir.join("app.db");
+        if db_path.exists() {
+            Self::self_heal(&db_path)?;
+        }
+        // 仅当确有迁移待执行时才备份（§11.2 升级前备份），且先收拢 WAL 保证副本完整
+        let pending = Self::migrations_pending(&db_path)?;
         let backup_path = data_dir.join("app.db.pre-migration.bak");
-        let existed = db_path.exists();
-        if existed {
+        if pending && db_path.exists() {
+            {
+                let conn = Connection::open(&db_path).map_err(AppError::from)?;
+                conn.pragma_update(None, "journal_mode", "WAL")
+                    .map_err(AppError::from)?;
+                // 收拢 WAL 后再复制主文件，避免副本缺数据
+                let _: String = conn
+                    .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| r.get(0))
+                    .map_err(AppError::from)?;
+            }
             std::fs::copy(&db_path, &backup_path).map_err(AppError::from)?;
         }
         let conn = Connection::open(&db_path).map_err(AppError::from)?;
@@ -221,24 +236,84 @@ impl Store {
         };
         if let Err(e) = store.migrate() {
             drop(store);
-            if existed {
+            if pending && backup_path.exists() {
                 let _ = std::fs::copy(&backup_path, &db_path);
+                let _ = std::fs::remove_file(data_dir.join("app.db-wal"));
+                let _ = std::fs::remove_file(data_dir.join("app.db-shm"));
             }
             return Err(AppError::internal(format!("数据库迁移失败，已从备份恢复：{e}")));
         }
-        Self::open_existing(&db_path)
+        Ok(store)
     }
 
-    fn open_existing(db_path: &Path) -> AppResult<Self> {
+    /// 快速完整性检查：true=健康，false=损坏。
+    fn quick_check_conn(conn: &Connection) -> bool {
+        conn.prepare("PRAGMA quick_check")
+            .and_then(|mut s| {
+                s.query_map([], |r| r.get::<_, String>(0))?
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .map(|rows| rows.iter().all(|r| r == "ok"))
+            .unwrap_or(false)
+    }
+
+    fn quick_check(db_path: &Path) -> bool {
+        match Connection::open(db_path) {
+            Ok(conn) => Self::quick_check_conn(&conn),
+            Err(_) => false,
+        }
+    }
+
+    /// 自愈：损坏先 REINDEX（索引可无损重建）；仍损坏则隔离文件并全新开始。
+    fn self_heal(db_path: &Path) -> AppResult<()> {
+        if Self::quick_check(db_path) {
+            return Ok(());
+        }
+        eprintln!("[skilldock] 数据库完整性检查未通过，尝试 REINDEX 修复");
+        let repaired = Connection::open(db_path)
+            .map(|conn| {
+                let _ = conn.pragma_update(None, "journal_mode", "WAL");
+                let _ = conn.execute_batch("PRAGMA reindex");
+                Self::quick_check_conn(&conn)
+            })
+            .unwrap_or(false);
+        if repaired {
+            eprintln!("[skilldock] REINDEX 修复成功");
+            return Ok(());
+        }
+        // 不可修复：隔离（不删除），以空库重新开始（§11.2：既有目标一律非托管）
+        let ts = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+        let dir = db_path.parent().unwrap_or(Path::new("."));
+        for suffix in ["", "-wal", "-shm"] {
+            let from = dir.join(format!("app.db{suffix}"));
+            if from.exists() {
+                let _ = std::fs::rename(&from, dir.join(format!("app.db.corrupt-{ts}{suffix}")));
+            }
+        }
+        eprintln!("[skilldock] 数据库不可修复，已隔离为 app.db.corrupt-{ts}* 并重新开始");
+        Ok(())
+    }
+
+    fn migrations_pending(db_path: &Path) -> AppResult<bool> {
+        if !db_path.exists() {
+            return Ok(true); // 新建库需要执行全部迁移
+        }
         let conn = Connection::open(db_path).map_err(AppError::from)?;
-        conn.pragma_update(None, "journal_mode", "WAL")
-            .map_err(AppError::from)?;
-        conn.pragma_update(None, "foreign_keys", "ON")
-            .map_err(AppError::from)?;
-        Ok(Self {
-            conn: Mutex::new(conn),
-            db_path: db_path.to_path_buf(),
-        })
+        let current: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        Ok((current as usize) < MIGRATIONS.len())
+    }
+
+    /// 收拢 WAL 到主文件（任务完成与退出时调用，降低崩溃损失窗口）。
+    pub fn checkpoint(&self) {
+        let conn = self.conn();
+        let _: Result<String, _> =
+            conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| r.get(0));
     }
 
     fn migrate(&self) -> AppResult<()> {
