@@ -16,9 +16,12 @@ SkillDock P0 发布就绪（需求文档 §15 M4 出口条件满足）：P0 验�
 
 - [P0 验收核对表：AC-01~AC-32 逐项证据与缺口处置](https://github.com/mrye111/SkillDock/issues/12) — docs/acceptance-checklist.md：27 项已验证、3 项部分覆盖、1 项待前端、界外已注明；补缺 AC-18/AC-22c 测试并修复移除计划复核 bug
 
+- [适配器实测版本矩阵：Claude Code / Cursor / Copilot 核实](https://github.com/mrye111/SkillDock/issues/13) — docs/adapter-matrix.md：三款实证（2.1.141 / 3.13.25 / 1.120.0+0.48.1）；Copilot .agents 改版本限定；核实日期 2026-09-09
+
 ## Not yet specified
 
 - Windows 10 22H2 兼容实测（§1 兼容测试项）：需要 Win10 环境，当前机器为 Win11。
+- VS Code 更新切换（new_Code.exe）后复核 Copilot 扩展版本与 .agents 默认列表（票 #13 遗留）。
 - 公开分发签名（§12.2）：需要代码签名证书决策；P0 阶段使用明确标记的内部测试包即可。
 - P1 功能地图（监听/自动同步/托盘/方案/标签/导入导出/深色/便携 ZIP）：P0 发布后另行开图。
 
@@ -26,4 +29,5 @@ SkillDock P0 发布就绪（需求文档 §15 M4 出口条件满足）：P0 验�
 
 - AC-28 干净虚拟机复测、AC-29 无 WebView2 离线包实测、AC-31 真实 Agent 加载验证——用户已明确取消（2026-09-09），如重启需另开新努力。
 - P1/P2 功能（需求 §3.2/§3.3）：跟随上一条雾区，不属于本图。
+
 
