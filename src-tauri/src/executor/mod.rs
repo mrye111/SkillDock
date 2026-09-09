@@ -435,8 +435,7 @@ impl<'a> Runner<'a> {
         );
         match result {
             Ok(()) => {
-                self.store
-                    .update_task_item_status(task_item_id, TaskItemStatus::Success, None)?;
+                // 成功状态已随 commit_item_success 一并落库
                 self.progress(task_id, "item_done", idx, count, Some(item), None);
                 Ok(())
             }
@@ -501,17 +500,16 @@ impl<'a> Runner<'a> {
             return Err(e);
         }
 
-        // 1. 暂存（同卷）并校验（§8.4 B/C）：只复制纳入分发清单的文件（§4.3）
+        // 1. 暂存（同卷）并校验（§8.4 B/C）：只复制纳入分发清单的文件（§4.3）；
+        //    单遍复制+逐文件 sha256 核验，摘要直接由已核验清单计算（不再二次读取暂存）
         if needs_content {
             let (source_dir, manifest) = self.content_manifest(item, library)?;
             let expected = item
                 .source_digest
                 .clone()
                 .ok_or_else(|| AppError::internal("计划项缺少源摘要"))?;
-            fsops::copy_manifest(&source_dir, &manifest, staging)?;
-            let staged = scanner::digest_directory(staging)?
-                .map(|(d, _)| d)
-                .ok_or_else(|| AppError::internal("暂存目录复制后读取失败"))?;
+            let (verified, _bytes) = fsops::copy_manifest(&source_dir, &manifest, staging)?;
+            let staged = scanner::digest_manifest(&verified);
             if staged != expected {
                 return Err(AppError::new(
                     ErrorCode::IoError,
@@ -601,12 +599,6 @@ impl<'a> Runner<'a> {
             Some((d, m)) => (Some(d.clone()), m.clone()),
             None => (None, Vec::new()),
         };
-        self.store.set_baseline(
-            &item.mapping_id,
-            post_digest.as_deref(),
-            &manifest,
-            Some(task_id),
-        )?;
         journal.phase = "committed".into();
         journal.updated_at = crate::storage::now_iso();
         self.write_journal(journal)?;
@@ -618,7 +610,6 @@ impl<'a> Runner<'a> {
         }
         let _ = std::fs::remove_file(self.journal_path(&journal.id));
         journal.phase = "done".into();
-        self.store.set_transaction_phase(&journal.id, "done")?;
 
         // 恢复成功后暂停相关映射的自动同步（§6.5）
         if item.action == PlanAction::Restore {
@@ -631,11 +622,16 @@ impl<'a> Runner<'a> {
             .filter(|f| f.kind != "delete")
             .map(|f| f.bytes)
             .sum();
-        self.store.update_task_item_digests(
+        // 基线 + 项状态 + 事务完成：合并为一个 DB 事务（§13 性能）
+        self.store.commit_item_success(
+            &item.mapping_id,
+            post_digest.as_deref(),
+            &manifest,
+            task_id,
             task_item_id,
-            journal.expected_old_digest.as_deref(),
             post_digest.as_deref(),
             bytes,
+            &journal.id,
         )?;
         Ok(())
     }
@@ -668,20 +664,14 @@ impl<'a> Runner<'a> {
         })?;
         let source_root = PathBuf::from(source_root);
         let ignore = scanner::build_globset(&library.ignore_patterns)?;
-        let scanned = scanner::scan_source_root(
-            &source_root,
-            &scanner::ScanOptions {
-                ignore: Some(&ignore),
-                skill_filter: Some(std::slice::from_ref(&item.rel_path)),
-                on_dir: None,
-            },
-        )?;
-        let skill = scanned.into_iter().next().ok_or_else(|| {
-            AppError::new(
-                ErrorCode::PlanStale,
-                format!("源技能目录已消失：{}", item.rel_path),
-            )
-        })?;
+        // 单技能直扫（不遍历源根其它目录；§13 性能）
+        let skill = scanner::scan_single_skill(&source_root, &item.rel_path, Some(&ignore))?
+            .ok_or_else(|| {
+                AppError::new(
+                    ErrorCode::PlanStale,
+                    format!("源技能目录已消失：{}", item.rel_path),
+                )
+            })?;
         Ok((skill.abs_path, skill.manifest))
     }
 

@@ -307,6 +307,31 @@ fn root_rel_path(root: &Path, p: &Path) -> String {
         .replace('\\', "/")
 }
 
+/// 扫描单个技能（执行器等逐技能路径）：不遍历源根其它目录。
+pub fn scan_single_skill(
+    source_root: &Path,
+    rel_path: &str,
+    ignore: Option<&GlobSet>,
+) -> Result<Option<ScannedSkill>, AppError> {
+    let dir = source_root.join(rel_path.replace('/', std::path::MAIN_SEPARATOR_STR));
+    let meta = match std::fs::symlink_metadata(&dir) {
+        Ok(m) => m,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(AppError::from(e)),
+    };
+    let dir_name = dir
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    if !meta.is_dir() || windows_paths::is_reparse_point(&meta) || should_skip_dir(&dir_name) {
+        return Ok(None);
+    }
+    if find_skill_md(&dir).is_none() {
+        return Ok(None);
+    }
+    Ok(Some(scan_one_skill(source_root, &dir, rel_path, ignore)?))
+}
+
 // ---------------------------------------------------------------------------
 // 扫描入口
 // ---------------------------------------------------------------------------
@@ -559,6 +584,181 @@ pub fn digest_directory(dir: &Path) -> Result<Option<(String, Vec<FileEntry>)>, 
         ));
     }
     Ok(Some((digest_manifest(&files), files)))
+}
+
+/// 只校验 SKILL.md 元数据（不遍历文件；配合摘要缓存的快速路径）。
+/// 返回 (name, description, issues, status)；嵌套符号链接由 digest 路径另行拒绝。
+pub fn validate_metadata_only(
+    dir: &Path,
+    dir_name: &str,
+) -> (Option<String>, Option<String>, Vec<ValidationIssue>, ValidationStatus) {
+    let mut issues = Vec::new();
+    let mut name = None;
+    let mut description = None;
+    match find_skill_md(dir) {
+        Some(skill_md) => match std::fs::read(&skill_md) {
+            Ok(raw) => match parse_frontmatter(&raw) {
+                Ok(fm) => {
+                    name = fm.name;
+                    description = fm.description;
+                    if !fm.external_refs.is_empty() {
+                        issues.push(ValidationIssue::new(
+                            "external_reference",
+                            format!("元数据引用了技能目录外的相对路径：{}", fm.external_refs.join(", ")),
+                        ));
+                    }
+                }
+                Err(issue) => issues.push(issue),
+            },
+            Err(e) => issues.push(ValidationIssue::new(
+                "unreadable",
+                format!("SKILL.md 无法完整读取：{e}"),
+            )),
+        },
+        None => issues.push(ValidationIssue::new(
+            "unreadable",
+            "缺少 SKILL.md",
+        )),
+    }
+    if let Some(n) = &name {
+        if let Some(issue) = validate_name(n) {
+            issues.push(issue);
+        } else if !n.eq_ignore_ascii_case(dir_name) {
+            issues.push(ValidationIssue::new(
+                "name_dir_mismatch",
+                format!("名称 `{n}` 与目录名 `{dir_name}` 不一致"),
+            ));
+        }
+    } else {
+        issues.push(ValidationIssue::new("missing_name", "缺少必填字段 name"));
+    }
+    match &description {
+        Some(d) if !d.is_empty() && d.chars().count() <= 1024 => {}
+        Some(_) => issues.push(ValidationIssue::new(
+            "missing_description",
+            "description 需为 1–1024 字符",
+        )),
+        None => issues.push(ValidationIssue::new("missing_description", "缺少必填字段 description")),
+    }
+    let status = if issues
+        .iter()
+        .any(|i| i.code == "symlink" || i.code == "external_reference")
+    {
+        ValidationStatus::Unsupported
+    } else if issues.is_empty() {
+        ValidationStatus::Valid
+    } else {
+        ValidationStatus::Invalid
+    };
+    (name, description, issues, status)
+}
+
+// ---------------------------------------------------------------------------
+// 摘要缓存（§8.1：修改时间仅作扫描加速提示，不作为提交判断依据）
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+struct DirSignature {
+    files: u64,
+    bytes: u64,
+    max_mtime: Option<std::time::SystemTime>,
+}
+
+/// 只 stat 不读内容：递归 (文件数, 总字节, 最大 mtime)。跳过与 collect_files 相同的目录。
+fn dir_signature(dir: &Path) -> Result<Option<DirSignature>, AppError> {
+    fn walk(dir: &Path, sig: &mut DirSignature) -> Result<(), AppError> {
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(e) => return Err(AppError::from(e)),
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let meta = std::fs::symlink_metadata(entry.path()).map_err(AppError::from)?;
+            if windows_paths::is_reparse_point(&meta) {
+                continue; // 与 digest_directory 一样由调用方另行拒绝；签名层跳过
+            }
+            if meta.is_dir() {
+                if !should_skip_dir(&name) {
+                    walk(&entry.path(), sig)?;
+                }
+            } else if meta.is_file() {
+                sig.files += 1;
+                sig.bytes += meta.len();
+                if let Ok(t) = meta.modified() {
+                    sig.max_mtime = Some(sig.max_mtime.map_or(t, |cur: std::time::SystemTime| cur.max(t)));
+                }
+            }
+        }
+        Ok(())
+    }
+    if !dir.is_dir() {
+        return Ok(None);
+    }
+    let mut sig = DirSignature { files: 0, bytes: 0, max_mtime: None };
+    walk(dir, &mut sig)?;
+    Ok(Some(sig))
+}
+
+struct DigestCacheEntry {
+    signature: DirSignature,
+    digest: String,
+    manifest: Vec<FileEntry>,
+}
+
+static DIGEST_CACHE: std::sync::Mutex<Option<std::collections::HashMap<String, DigestCacheEntry>>> =
+    std::sync::Mutex::new(None);
+
+/// 带签名校验的目录摘要：签名（文件数+总字节+最大 mtime）未变则复用缓存，否则全新计算。
+/// 仅用于矩阵/预览等展示路径；执行与提交复核一律用 `digest_directory` 全新计算。
+pub fn digest_directory_cached(dir: &Path) -> Result<Option<(String, Vec<FileEntry>)>, AppError> {
+    // 重解析点与非法形态必须每次都查（不缓存判断结果）
+    let meta = match std::fs::symlink_metadata(dir) {
+        Ok(m) => m,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(AppError::from(e)),
+    };
+    if windows_paths::is_reparse_point(&meta) {
+        return Err(AppError::new(
+            ErrorCode::Unsupported,
+            format!(
+                "目标是符号链接/目录联接，按规则不跟随、不改动；请确认后手动处理：{}",
+                dir.display()
+            ),
+        ));
+    }
+    if !meta.is_dir() {
+        return Err(AppError::invalid_path(format!(
+            "目标位置已存在同名文件而非目录：{}",
+            dir.display()
+        )));
+    }
+    let key = windows_paths::fold_case(dir);
+    let Some(sig) = dir_signature(dir)? else {
+        return Ok(None);
+    };
+    {
+        let cache = DIGEST_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(entry) = cache.as_ref().and_then(|c| c.get(&key)) {
+            if entry.signature == sig {
+                return Ok(Some((entry.digest.clone(), entry.manifest.clone())));
+            }
+        }
+    }
+    let Some((digest, manifest)) = digest_directory(dir)? else {
+        return Ok(None);
+    };
+    let mut cache = DIGEST_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    cache
+        .get_or_insert_with(std::collections::HashMap::new)
+        .insert(key, DigestCacheEntry { signature: sig, digest: digest.clone(), manifest: manifest.clone() });
+    Ok(Some((digest, manifest)))
+}
+
+/// 清空摘要缓存（测试用）。
+pub fn clear_digest_cache() {
+    if let Some(c) = DIGEST_CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
+        c.clear();
+    }
 }
 
 // ---------------------------------------------------------------------------

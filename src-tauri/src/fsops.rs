@@ -6,8 +6,8 @@
 
 use crate::error::AppResult;
 use crate::scanner::FileEntry;
-use crate::scanner;
 use crate::windows_paths;
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 /// 递归复制目录内容（保持字节与结构），返回清单与总字节数。
@@ -69,31 +69,56 @@ fn copy_tree_inner(
 }
 
 /// 按清单复制（只复制纳入分发的文件，被忽略规则排除的文件不落盘；§4.3）。
-/// 逐文件校验 sha256，任一不符即失败。
-pub fn copy_manifest(src_root: &Path, manifest: &[FileEntry], dst: &Path) -> AppResult<u64> {
+/// 单遍完成：边读源边写暂存边算 sha256——不产生暂存二次读取（§8.4 C 完整校验）。
+/// 返回已逐文件核验过的清单条目（调用方直接用于摘要比对）。
+pub fn copy_manifest(
+    src_root: &Path,
+    manifest: &[FileEntry],
+    dst: &Path,
+) -> AppResult<(Vec<FileEntry>, u64)> {
+    use std::io::{Read, Write};
+    let mut entries = Vec::with_capacity(manifest.len());
     let mut total = 0u64;
+    let mut buf = vec![0u8; 1024 * 1024];
     for f in manifest {
         let comps = windows_paths::validate_rel_path(&f.rel_path)?;
-        let mut from = src_root.to_path_buf();
-        let mut to = dst.to_path_buf();
+        let mut from_p = src_root.to_path_buf();
+        let mut to_p = dst.to_path_buf();
         for c in &comps {
-            from.push(c);
-            to.push(c);
+            from_p.push(c);
+            to_p.push(c);
         }
-        if let Some(parent) = to.parent() {
+        if let Some(parent) = to_p.parent() {
             std::fs::create_dir_all(parent).map_err(crate::error::AppError::from)?;
         }
-        std::fs::copy(&from, &to).map_err(crate::error::AppError::from)?;
-        let actual = scanner::sha256_file(&to)?;
-        if actual != f.sha256 {
+        let mut from = std::fs::File::open(&from_p).map_err(crate::error::AppError::from)?;
+        let mut to = std::fs::File::create(&to_p).map_err(crate::error::AppError::from)?;
+        let mut h = Sha256::new();
+        let mut size = 0u64;
+        loop {
+            let n = from.read(&mut buf).map_err(crate::error::AppError::from)?;
+            if n == 0 {
+                break;
+            }
+            h.update(&buf[..n]);
+            to.write_all(&buf[..n]).map_err(crate::error::AppError::from)?;
+            size += n as u64;
+        }
+        let sha = hex::encode(h.finalize());
+        if sha != f.sha256 {
             return Err(crate::error::AppError::new(
                 crate::error::ErrorCode::IoError,
                 format!("暂存文件校验失败：{}", f.rel_path),
             ));
         }
-        total += f.size;
+        total += size;
+        entries.push(FileEntry {
+            rel_path: f.rel_path.clone(),
+            size,
+            sha256: sha,
+        });
     }
-    Ok(total)
+    Ok((entries, total))
 }
 
 /// 同卷改名（§8.4：不跨卷移动正式目录；调用方保证同卷）。

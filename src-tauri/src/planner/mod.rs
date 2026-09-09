@@ -5,7 +5,7 @@
 
 use crate::contract::*;
 use crate::error::{AppError, AppResult, ErrorCode};
-use crate::scanner::{self, FileEntry, ScanOptions};
+use crate::scanner::{self, FileEntry};
 use crate::storage::{PlanGroupMeta, PlanRow, Store};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
@@ -286,7 +286,7 @@ pub fn matrix_cells(
             let physical = store.get_physical_target(&mapping.physical_target_id)?;
             let target_dir = PathBuf::from(&physical.canonical_path).join(&mapping.target_dir_name);
             // 目标读取失败（符号链接等）：单元格标记不支持，不拖垮整个矩阵
-            let target_scan = scanner::digest_directory(&target_dir);
+            let target_scan = scanner::digest_directory_cached(&target_dir);
             if let Err(e) = target_scan {
                 cells.insert(
                     mapping.physical_target_id.clone(),
@@ -429,6 +429,8 @@ pub fn create_plan(store: &Store, input: &CreateSyncPlanInput) -> AppResult<Sync
     store.plan_view(&row)
 }
 
+/// 源技能实时内容：内容摘要走签名缓存（§8.1 加速提示），忽略规则每次现算，
+/// SKILL.md 元数据每次全新校验（单文件，廉价）。嵌套链接 → Unsupported 而非计划失败。
 fn live_source(
     skill: &crate::storage::SkillRow,
     source_root: &Path,
@@ -438,18 +440,41 @@ fn live_source(
     if !skill_dir.is_dir() {
         return Ok((None, Vec::new(), skill.validation_status, Vec::new()));
     }
-    let scanned = scanner::scan_source_root(
-        source_root,
-        &ScanOptions {
-            ignore: Some(ignore),
-            skill_filter: Some(&[skill.rel_path.clone()]),
-            on_dir: None,
-        },
-    )?;
-    match scanned.into_iter().next() {
-        Some(s) => Ok((s.digest, s.manifest, s.status, s.excluded_by_ignore)),
-        None => Ok((None, Vec::new(), skill.validation_status, Vec::new())),
+    let dir_name = skill
+        .rel_path
+        .rsplit('/')
+        .next()
+        .unwrap_or(&skill.rel_path)
+        .to_string();
+    let (_, _, _, status) = scanner::validate_metadata_only(&skill_dir, &dir_name);
+    let raw = match scanner::digest_directory_cached(&skill_dir) {
+        Ok(Some((d, m))) => Some((d, m)),
+        Ok(None) => None,
+        Err(e) if e.code == ErrorCode::Unsupported => {
+            return Ok((None, Vec::new(), ValidationStatus::Unsupported, Vec::new()))
+        }
+        Err(e) => return Err(e),
+    };
+    let Some((_, raw_manifest)) = raw else {
+        return Ok((None, Vec::new(), status, Vec::new()));
+    };
+    // 应用忽略规则（相对源根的 glob 语义；§4.3）
+    let mut manifest = Vec::with_capacity(raw_manifest.len());
+    let mut excluded = Vec::new();
+    for f in raw_manifest {
+        let root_rel = format!("{}/{}", skill.rel_path, f.rel_path);
+        if ignore.is_match(&root_rel) {
+            excluded.push(f.rel_path);
+        } else {
+            manifest.push(f);
+        }
     }
+    let digest = if status == ValidationStatus::Valid {
+        Some(scanner::digest_manifest(&manifest))
+    } else {
+        None
+    };
+    Ok((digest, manifest, status, excluded))
 }
 
 fn plan_sync_item(
@@ -464,7 +489,7 @@ fn plan_sync_item(
     let (s_digest, s_manifest, live_status, excluded) =
         live_source(&skill, source_root, ignore)?;
     // 目标端读取失败（如符号链接/目录联接）→ 单项阻塞，不拖垮整个预览（§7.2）
-    let (t_digest, t_manifest, target_blocked) = match scanner::digest_directory(target_dir) {
+    let (t_digest, t_manifest, target_blocked) = match scanner::digest_directory_cached(target_dir) {
         Ok(Some((d, m))) => (Some(d), m, None),
         Ok(None) => (None, Vec::new(), None),
         Err(e) => (None, Vec::new(), Some(e.message)),
@@ -558,7 +583,7 @@ fn plan_remove_item(
     let skill = store.get_skill(&mapping.skill_id)?;
     let baseline = store.get_baseline(&mapping.id)?;
     // 目标读取失败（符号链接等）→ 阻塞移除，不在未知内容上动手
-    let (t_digest, t_manifest, read_blocked) = match scanner::digest_directory(target_dir) {
+    let (t_digest, t_manifest, read_blocked) = match scanner::digest_directory_cached(target_dir) {
         Ok(Some((d, m))) => (Some(d), m, None),
         Ok(None) => (None, Vec::new(), None),
         Err(e) => (None, Vec::new(), Some(e.message)),
@@ -917,7 +942,7 @@ fn apply_choice(
         let ignore = scanner::build_globset(&library.ignore_patterns)?;
         let skill = store.get_skill(&item.skill_id)?;
         let (s_digest, s_manifest, _, _) = live_source(&skill, &source_root, &ignore)?;
-        let (_, t_manifest) = scanner::digest_directory(Path::new(&item.target_path))?
+        let (_, t_manifest) = scanner::digest_directory_cached(Path::new(&item.target_path))?
             .map(|(d, m)| (Some(d), m))
             .unwrap_or((None, Vec::new()));
         item.file_changes = diff_manifests(

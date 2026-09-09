@@ -226,10 +226,7 @@ impl Store {
             std::fs::copy(&db_path, &backup_path).map_err(AppError::from)?;
         }
         let conn = Connection::open(&db_path).map_err(AppError::from)?;
-        conn.pragma_update(None, "journal_mode", "WAL")
-            .map_err(AppError::from)?;
-        conn.pragma_update(None, "foreign_keys", "ON")
-            .map_err(AppError::from)?;
+        Self::configure_conn(&conn)?;
         let store = Self {
             conn: Mutex::new(conn),
             db_path: db_path.clone(),
@@ -244,6 +241,19 @@ impl Store {
             return Err(AppError::internal(format!("数据库迁移失败，已从备份恢复：{e}")));
         }
         Ok(store)
+    }
+
+    /// 连接参数：WAL + 外键；synchronous=NORMAL——应用崩溃不丢已提交事务，
+    /// 崩溃恢复以磁盘现实+事务日志为准（§8.4），不依赖每页即时落盘；
+    /// 换来同步路径上 fsync 数量级下降（§13 同步性能预算）。
+    fn configure_conn(conn: &Connection) -> AppResult<()> {
+        conn.pragma_update(None, "journal_mode", "WAL")
+            .map_err(AppError::from)?;
+        conn.pragma_update(None, "synchronous", "NORMAL")
+            .map_err(AppError::from)?;
+        conn.pragma_update(None, "foreign_keys", "ON")
+            .map_err(AppError::from)?;
+        Ok(())
     }
 
     /// 快速完整性检查：true=健康，false=损坏。
@@ -1513,6 +1523,43 @@ impl Store {
         )?;
         let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// 单项事务成功的收尾写入合并为一个 DB 事务（基线 + 项状态 + 事务完成）。
+    /// 减少同步路径上的提交次数（§13 性能预算）。
+    #[allow(clippy::too_many_arguments)]
+    pub fn commit_item_success(
+        &self,
+        mapping_id: &str,
+        digest: Option<&str>,
+        manifest: &[crate::scanner::FileEntry],
+        task_id: &str,
+        task_item_id: &str,
+        post_digest: Option<&str>,
+        bytes: u64,
+        tx_id: &str,
+    ) -> AppResult<()> {
+        let conn = self.conn();
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "INSERT INTO baselines(mapping_id, digest, manifest_json, task_id, updated_at)
+             VALUES (?1,?2,?3,?4,?5)
+             ON CONFLICT(mapping_id) DO UPDATE SET
+               digest=excluded.digest, manifest_json=excluded.manifest_json,
+               task_id=excluded.task_id, updated_at=excluded.updated_at",
+            params![mapping_id, digest, serde_json::to_string(manifest)?, task_id, now_iso()],
+        )?;
+        tx.execute(
+            "UPDATE task_items SET post_digest=?2, bytes_processed=?3, status='success', error_json=NULL
+             WHERE id=?1",
+            params![task_item_id, post_digest, bytes as i64],
+        )?;
+        tx.execute(
+            "UPDATE recovery_transactions SET phase='done', updated_at=?2 WHERE id=?1",
+            params![tx_id, now_iso()],
+        )?;
+        tx.commit()?;
+        Ok(())
     }
 
     // ------------------------------------------------------------------
