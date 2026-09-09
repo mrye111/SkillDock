@@ -884,7 +884,14 @@ pub fn update_backup_settings(
 pub fn open_registered_path(state: St, kind: String, id: String) -> AppResult<()> {
     let path = match kind.as_str() {
         "library" => state.store.get_library(&id)?.canonical_path,
-        "target" => state.store.get_physical_target(&id)?.canonical_path,
+        // id 同时接受目标 ID 与物理目标 ID（契约 v1.4.1 放宽）
+        "target" => match state.store.get_physical_target(&id) {
+            Ok(p) => p.canonical_path,
+            Err(_) => {
+                let t = state.store.get_target(&id)?;
+                state.store.get_physical_target(&t.physical_target_id)?.canonical_path
+            }
+        },
         "task_item" => state.store.get_task_item(&id)?.target_path,
         "snapshot" => {
             let s = state.store.get_snapshot(&id)?;
