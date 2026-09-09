@@ -9,7 +9,7 @@ use crate::windows_paths;
 use std::path::{Path, PathBuf};
 
 /// 适配器规则核实日期（§5：文档规则已核实 ≠ 真实客户端已验证；发版时锁定实测矩阵）。
-pub const ADAPTER_VERSION: &str = "2026-09-08";
+pub const ADAPTER_VERSION: &str = "2026-09-09";
 
 pub struct AdapterDef {
     pub id: &'static str,
@@ -65,7 +65,10 @@ pub static ADAPTERS: &[AdapterDef] = &[
         user_template: Some("%USERPROFILE%\\.cursor\\skills"),
         project_template: Some("{PROJECT}\\.cursor\\skills"),
         also_read_by: &[],
-        notes: &["Cursor 还会读取 .agents、.claude、.codex 下的兼容技能目录，可能存在重复发现"],
+        notes: &[
+            "Cursor 还会读取 .agents、.claude、.codex 下的兼容技能目录（用户级与项目级均读，可能存在重复发现；已按本机 Cursor 3.13.25 二进制实证）",
+            "内置 skills-cursor/、插件目录与 cloud-skills/ 属工具自有位置，不在管理范围",
+        ],
         detect_hints: &["%USERPROFILE%\\.cursor"],
         env_override: None,
     },
@@ -76,8 +79,11 @@ pub static ADAPTERS: &[AdapterDef] = &[
         scopes: &[TargetScope::User, TargetScope::Project],
         user_template: Some("%USERPROFILE%\\.copilot\\skills"),
         project_template: Some("{PROJECT}\\.github\\skills"),
-        also_read_by: &["VS Code 也支持用户/项目级 .claude 与 .agents 技能目录"],
-        notes: &["首版验收限定 Windows 桌面 VS Code；Copilot CLI 与网页端不在已验证范围"],
+        also_read_by: &["VS Code 也读取用户/项目级 .claude 技能目录（项目级另有 .github/skills）"],
+        notes: &[
+            "首版验收限定 Windows 桌面 VS Code；Copilot CLI 与网页端不在已验证范围",
+            "已按本机 VS Code 1.120.0 + Copilot Chat 0.48.1 实测（extension.js 默认列表）：用户级 .copilot/skills + .claude/skills、项目级 .github/skills + .claude/skills；官方文档称支持 .agents/skills，但本机 0.48.1 默认列表未包含，按版本确认",
+        ],
         detect_hints: &["%USERPROFILE%\\.copilot", "%USERPROFILE%\\.vscode"],
         env_override: None,
     },

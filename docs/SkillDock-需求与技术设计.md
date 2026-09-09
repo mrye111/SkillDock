@@ -1,6 +1,6 @@
 # SkillDock — Windows Skills 同步工具需求与技术设计
 
-文档版本：1.3 · 编写日期：2026-09-08 · 状态：开发需求基线（v1.1：Codex 技能目录按 codex-cli 0.147.0 实测校正为 .codex/skills；v1.2：默认安装位置按 Tauri NSIS 实测更正为 %LOCALAPPDATA%/SkillDock；v1.3：新增文档目录操作日志（SkillDock-操作日志.jsonl）与数据库启动自愈（完整性检查 + REINDEX + 不可修复时隔离重建）要求）
+文档版本：1.4 · 编写日期：2026-09-08 · 状态：开发需求基线（v1.1：Codex 技能目录按 codex-cli 0.147.0 实测校正为 .codex/skills；v1.2：默认安装位置按 Tauri NSIS 实测更正为 %LOCALAPPDATA%/SkillDock；v1.3：新增文档目录操作日志（SkillDock-操作日志.jsonl）与数据库启动自愈（完整性检查 + REINDEX + 不可修复时隔离重建）要求）
 
 产品名称：**SkillDock**。产品标语：**一处维护，随处可用。**
 
@@ -164,7 +164,7 @@ P0 设置页提供源库级忽略模式，沿用相对根路径的 glob 语义�
 | Codex | `<用户目录>/.codex/skills/` | `<目标项目>/.codex/skills/` | 用户级随 `CODEX_HOME` 环境变量变化（默认 `~/.codex`）；2026-09-08 按 codex-cli 0.147.0 本机实测校正（二进制字符串验证）；部分在线文档写 .agents/skills，与实测不符，以客户端实测为准。[Codex Skills](https://developers.openai.com/codex/skills) |
 | Claude Code | `<用户目录>/.claude/skills/` | `<目标项目>/.claude/skills/` | 自定义配置目录应考虑 CLAUDE_CONFIG_DIR；保留工具专有元数据。[Skills](https://code.claude.com/docs/en/skills)、[配置目录](https://code.claude.com/docs/en/claude-directory) |
 | Cursor | `<用户目录>/.cursor/skills/` | `<目标项目>/.cursor/skills/` | 还会读取 .agents、.claude、.codex 下的兼容技能目录；需识别重复发现。[Cursor Skills](https://prod.cursor.com/docs/skills) |
-| GitHub Copilot（VS Code） | `<用户目录>/.copilot/skills/` | `<目标项目>/.github/skills/` | VS Code 也支持用户/项目 .claude 与 .agents 技能目录，并允许配置附加项目位置。[VS Code Agent Skills](https://code.visualstudio.com/docs/agent-customization/agent-skills) |
+| GitHub Copilot（VS Code） | `<用户目录>/.copilot/skills/` | `<目标项目>/.github/skills/` | VS Code 也读取用户/项目 .claude 技能目录；官方文档称支持 .agents/skills，本机 Copilot Chat 0.48.1 默认列表未包含（按版本确认，2026-09-09 实测）。[VS Code Agent Skills](https://code.visualstudio.com/docs/agent-customization/agent-skills) |
 | 自定义目录 | 用户自行选择 | 用户自行选择 | 将所选目录视为技能集合根，不推断 Agent 的加载规则 |
 
 Codex 的技能目录按实测客户端版本锁定（当前实测：codex-cli 0.147.0 读取 `$CODEX_HOME/skills` 与项目级 `.codex/skills`）；`.agents/skills/` 仅作为可能的历史/文档差异候选展示，不自动双写或迁移。本地发现某个目录存在不能取代版本验证。P0 不管理企业策略目录、Agent 内置技能或插件缓存目录。
