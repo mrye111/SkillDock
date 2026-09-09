@@ -759,7 +759,8 @@ pub fn validate_for_execute(store: &Store, plan_id: &str, plan_version: i64) -> 
             .map(|(d, _)| (Some(d), ()))
             .unwrap_or((None, ()));
         // 恢复项的内容来源是静态快照（§7.4），源库不回退——只复核目标摘要
-        let source_ok = if item.action == PlanAction::Restore || plan.operation == PlanOperation::Restore {
+        // 恢复项的内容来源是静态快照（§7.4），源库不回退；移除不依赖源内容——均只复核目标摘要
+        let source_ok = if matches!(plan.operation, PlanOperation::Restore | PlanOperation::Remove) {
             true
         } else {
             let skill = store.get_skill(&item.skill_id)?;

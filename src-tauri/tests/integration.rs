@@ -1324,3 +1324,108 @@ fn disabled_mapping_shows_no_cell_not_paused() {
         MatrixCellState::Paused
     );
 }
+
+// ---------------------------------------------------------------------------
+// AC-18 / AC-22 补缺
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ac18_failing_target_does_not_block_others() {
+    let env = Env::new();
+    env.write_skill("demo", "演示", &["x"]);
+    let lib = env.register_and_scan();
+
+    // 目标A（将失败）：事务父路径被同名文件占用 → 事务空间预检失败
+    let dst_bad = env._tmp.path().join("bad-target").join("skills");
+    let tx_parent_bad = skilldock_lib::fsops::sibling_transaction_root(&dst_bad);
+    std::fs::create_dir_all(tx_parent_bad.parent().unwrap()).unwrap();
+    std::fs::write(&tx_parent_bad, b"not a dir").unwrap();
+    let pt_bad = env
+        .store
+        .upsert_physical_target(
+            &windows_paths::fold_case(&dst_bad),
+            &dst_bad.to_string_lossy(),
+            Availability::WillCreate,
+        )
+        .unwrap();
+    let m_bad = env.map_skill(&lib, "demo", &pt_bad.id);
+
+    // 目标B（应成功）
+    let pt_good = env.add_target();
+    let m_good = env.map_skill(&lib, "demo", &pt_good);
+
+    let plan = env.plan(&lib, &[m_bad, m_good.clone()]);
+    let task = env.execute(&plan);
+    let view = task_view(&env, &task);
+
+    let bad_item = view
+        .items
+        .iter()
+        .find(|i| i.target_path.contains("bad-target"))
+        .expect("应包含失败目标项");
+    assert_eq!(bad_item.status, TaskItemStatus::Failed);
+    let err = bad_item.error.as_ref().unwrap();
+    let err_text = format!("{}{:?}", err.message, err.context);
+    assert!(err_text.contains("bad-target") || err_text.contains(".skilldock-transactions"),
+        "错误应包含受影响路径（AC-18），实际：{err_text}");
+
+    let good_item = view
+        .items
+        .iter()
+        .find(|i| i.target_path.contains("agent-target"))
+        .unwrap();
+    assert_eq!(good_item.status, TaskItemStatus::Success, "其他目标独立完成");
+    assert!(env.target_skill_dir("demo").join("SKILL.md").exists());
+    assert_eq!(view.status, TaskStatus::Partial, "部分完成（§11.1）");
+}
+
+#[test]
+fn ac22c_remove_managed_skill_and_restore_rebuilds() {
+    let env = Env::new();
+    env.write_skill("demo", "演示", &["x"]);
+    let lib = env.register_and_scan();
+    let pt = env.add_target();
+    let m = env.map_skill(&lib, "demo", &pt);
+    env.execute(&env.plan(&lib, std::slice::from_ref(&m)));
+    assert!(env.target_skill_dir("demo").exists());
+
+    // 移除托管技能（独立计划，§8.3：归属匹配 + T=B → 可常规预览移除）
+    let plan = planner::create_plan(
+        &env.store,
+        &CreateSyncPlanInput {
+            library_id: lib.clone(),
+            operation: PlanOperation::Remove,
+            mapping_ids: vec![m.clone()],
+        },
+    )
+    .unwrap();
+    let item = plan_item(&plan, "demo");
+    assert_eq!(item.action, PlanAction::Remove);
+    assert!(item.needs_backup, "整项移除前必须备份（§7.4）");
+    let remove_task = env.execute_op(&plan, TaskKind::Remove);
+    assert!(!env.target_skill_dir("demo").exists(), "移除后目标目录不存在");
+    let baseline = env.store.get_baseline(&m).unwrap().unwrap();
+    assert!(baseline.digest.is_none(), "移除后基线登记为「不存在」标记");
+
+    // 从移除任务恢复 → 重建旧目录（AC-22）
+    let view = task_view(&env, &remove_task);
+    let item_id = view.items[0].item_id.clone();
+    let recovery = Recovery { store: &env.store, backups: &env.backups, data_dir: &env.data };
+    let plan = recovery
+        .create_restore_plan(&CreateRestorePlanInput {
+            task_id: remove_task,
+            item_ids: vec![item_id],
+        })
+        .unwrap();
+    let item = plan_item(&plan, "demo");
+    assert_eq!(item.action, PlanAction::Restore);
+    assert_eq!(item.restore.as_ref().unwrap().to_absent, false);
+    env.execute_op(&plan, TaskKind::Restore);
+    assert!(env.target_skill_dir("demo").join("SKILL.md").exists(), "恢复重建旧目录（AC-22）");
+    assert_eq!(
+        env.digest_of(&env.src.join("demo")),
+        env.digest_of(&env.target_skill_dir("demo"))
+    );
+    let mapping = env.store.get_mapping(&m).unwrap();
+    assert_eq!(mapping.paused_reason.as_deref(), Some("restored"), "恢复后映射暂停（§6.5）");
+}

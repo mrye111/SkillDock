@@ -691,7 +691,10 @@ impl<'a> Runner<'a> {
         let tx_parent = fsops::sibling_transaction_root(physical_dir);
         if tx_parent.exists() {
             let known = self.store.known_transaction_dirs()?;
-            for entry in std::fs::read_dir(&tx_parent).map_err(AppError::from)? {
+            let read = std::fs::read_dir(&tx_parent).map_err(|e| {
+                AppError::from(e).with_context(serde_json::json!({ "path": tx_parent.to_string_lossy() }))
+            })?;
+            for entry in read {
                 let entry = entry.map_err(AppError::from)?;
                 let name = entry.file_name().to_string_lossy().to_string();
                 if !known.iter().any(|k| k == &name) {
@@ -705,7 +708,9 @@ impl<'a> Runner<'a> {
                 }
             }
         }
-        std::fs::create_dir_all(tx_root).map_err(AppError::from)?;
+        std::fs::create_dir_all(tx_root).map_err(|e| {
+            AppError::from(e).with_context(serde_json::json!({ "path": tx_root.to_string_lossy() }))
+        })?;
         // 写入/重命名权限与空间预检（§8.5：考虑暂存新旧版本同时存在的峰值）
         let probe = tx_root.join(".probe");
         std::fs::write(&probe, b"ok").map_err(AppError::from)?;
