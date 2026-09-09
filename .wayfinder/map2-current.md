@@ -20,6 +20,8 @@ SkillDock P0 发布就绪（需求文档 §15 M4 出口条件满足）：P0 验�
 
 - [依赖许可说明（Rust + npm + WebView2）](https://github.com/mrye111/SkillDock/issues/15) — docs/THIRD-PARTY-NOTICES.md：246 crate + 199 包全清单，无 GPL 系；生成脚本可复跑
 
+- [用户指南（首次同步/冲突/恢复/路径权限）](https://github.com/mrye111/SkillDock/issues/16) — docs/user-guide.md v1.0：7 节全覆盖，以已实现行为为准
+
 ## Not yet specified
 
 - Windows 10 22H2 兼容实测（§1 兼容测试项）：需要 Win10 环境，当前机器为 Win11。
@@ -31,6 +33,7 @@ SkillDock P0 发布就绪（需求文档 §15 M4 出口条件满足）：P0 验�
 
 - AC-28 干净虚拟机复测、AC-29 无 WebView2 离线包实测、AC-31 真实 Agent 加载验证——用户已明确取消（2026-09-09），如重启需另开新努力。
 - P1/P2 功能（需求 §3.2/§3.3）：跟随上一条雾区，不属于本图。
+
 
 
 
