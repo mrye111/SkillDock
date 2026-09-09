@@ -18,6 +18,8 @@ SkillDock P0 发布就绪（需求文档 §15 M4 出口条件满足）：P0 验�
 
 - [适配器实测版本矩阵：Claude Code / Cursor / Copilot 核实](https://github.com/mrye111/SkillDock/issues/13) — docs/adapter-matrix.md：三款实证（2.1.141 / 3.13.25 / 1.120.0+0.48.1）；Copilot .agents 改版本限定；核实日期 2026-09-09
 
+- [依赖许可说明（Rust + npm + WebView2）](https://github.com/mrye111/SkillDock/issues/15) — docs/THIRD-PARTY-NOTICES.md：246 crate + 199 包全清单，无 GPL 系；生成脚本可复跑
+
 ## Not yet specified
 
 - Windows 10 22H2 兼容实测（§1 兼容测试项）：需要 Win10 环境，当前机器为 Win11。
@@ -29,5 +31,6 @@ SkillDock P0 发布就绪（需求文档 §15 M4 出口条件满足）：P0 验�
 
 - AC-28 干净虚拟机复测、AC-29 无 WebView2 离线包实测、AC-31 真实 Agent 加载验证——用户已明确取消（2026-09-09），如重启需另开新努力。
 - P1/P2 功能（需求 §3.2/§3.3）：跟随上一条雾区，不属于本图。
+
 
 
