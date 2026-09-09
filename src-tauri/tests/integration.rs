@@ -1286,3 +1286,41 @@ fn bulk_adopt_same_content_and_take_over_others() {
     .unwrap();
     assert!(outcome3.applied.is_empty() && outcome3.skipped.is_empty(), "无匹配项时空结果");
 }
+
+#[test]
+fn disabled_mapping_shows_no_cell_not_paused() {
+    let env = Env::new();
+    env.write_skill("demo", "演示", &["x"]);
+    let lib = env.register_and_scan();
+    let pt = env.add_target();
+    let m = env.map_skill(&lib, "demo", &pt);
+    env.execute(&env.plan(&lib, std::slice::from_ref(&m)));
+
+    let skills = env.store.list_skills(&lib).unwrap();
+    let librow = env.store.get_library(&lib).unwrap();
+    let cells = planner::matrix_cells(&env.store, &librow, &skills).unwrap();
+    assert_eq!(
+        cells[&format!("{lib}:demo")][&pt].state,
+        MatrixCellState::Synced
+    );
+
+    // 取消勾选（停用映射）→ 单元格消失（前端显示「未选择」），而不是「已暂停」
+    env.store.set_mapping_enabled(&m, false).unwrap();
+    let cells = planner::matrix_cells(&env.store, &librow, &skills).unwrap();
+    let skill_cells = cells.get(&format!("{lib}:demo"));
+    assert!(
+        skill_cells.map(|c| !c.contains_key(&pt)).unwrap_or(true),
+        "停用映射不应渲染为已暂停单元格"
+    );
+    // 磁盘内容不动（AC-14）
+    assert!(env.target_skill_dir("demo").join("SKILL.md").exists());
+
+    // 暂停（enabled 但 paused_reason 有值）才显示 paused
+    env.store.set_mapping_enabled(&m, true).unwrap();
+    env.store.set_mapping_paused(&m, Some("user")).unwrap();
+    let cells = planner::matrix_cells(&env.store, &librow, &skills).unwrap();
+    assert_eq!(
+        cells[&format!("{lib}:demo")][&pt].state,
+        MatrixCellState::Paused
+    );
+}

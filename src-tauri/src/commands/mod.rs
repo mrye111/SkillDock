@@ -611,6 +611,8 @@ pub fn update_mappings(
                 .find(|m| &m.physical_target_id == pt && !m.enabled);
             if let Some(m) = revived {
                 state.store.set_mapping_enabled(&m.id, true)?;
+                // 重新勾选 = 明确的恢复意图：同时清除暂停标记（§6.5 恢复常规同步）
+                state.store.set_mapping_paused(&m.id, None)?;
             } else {
                 state
                     .store

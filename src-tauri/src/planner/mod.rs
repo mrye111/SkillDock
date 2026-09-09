@@ -279,6 +279,10 @@ pub fn matrix_cells(
         };
         let cells = out.entry(skill.id.clone()).or_default();
         for mapping in skill_mappings {
+            // 已停用（取消勾选）的映射不产出单元格 → 前端显示「未选择」（§7.1/AC-14）
+            if !mapping.enabled {
+                continue;
+            }
             let physical = store.get_physical_target(&mapping.physical_target_id)?;
             let target_dir = PathBuf::from(&physical.canonical_path).join(&mapping.target_dir_name);
             // 目标读取失败（符号链接等）：单元格标记不支持，不拖垮整个矩阵
@@ -321,7 +325,7 @@ pub fn matrix_cells(
                 target,
                 baseline_c,
                 skill.validation_status,
-                mapping.paused_reason.is_some() || !mapping.enabled,
+                mapping.paused_reason.is_some(),
                 false,
             );
             cells.insert(
