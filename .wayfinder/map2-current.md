@@ -24,6 +24,8 @@ SkillDock P0 发布就绪（需求文档 §15 M4 出口条件满足）：P0 验�
 
 - [前端衔接收尾与 P0 交互验收](https://github.com/mrye111/SkillDock/issues/14) — v1.4 批量按钮/日志入口接入、批量关联保留暂停映射、复选框部分关联态、错误边界；编译+核对通过
 
+- [GitHub Release：P0 内部测试包发布](https://github.com/mrye111/SkillDock/issues/17) — [v0.1.0 prerelease](https://github.com/mrye111/SkillDock/releases/tag/v0.1.0)：双 EXE + 校验值 + 许可说明 + 版本说明（能力/实测/矩阵/限制/安装记录）
+
 ## Not yet specified
 
 - Windows 10 22H2 兼容实测（§1 兼容测试项）：需要 Win10 环境，当前机器为 Win11。
@@ -35,6 +37,7 @@ SkillDock P0 发布就绪（需求文档 §15 M4 出口条件满足）：P0 验�
 
 - AC-28 干净虚拟机复测、AC-29 无 WebView2 离线包实测、AC-31 真实 Agent 加载验证——用户已明确取消（2026-09-09），如重启需另开新努力。
 - P1/P2 功能（需求 §3.2/§3.3）：跟随上一条雾区，不属于本图。
+
 
 
 
