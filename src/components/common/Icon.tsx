@@ -1,4 +1,5 @@
 import React from 'react';
+import logoPng from '../../assets/logo.png';
 
 export const ICON_PATHS: Record<string, string> = {
   layers: '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/>',
@@ -71,31 +72,16 @@ export const Icon: React.FC<IconProps> = ({ name, className = '', size = 19, sty
 
 export const BrandLogo: React.FC<{ className?: string; size?: number }> = ({
   className = '',
-  size = 30,
+  size = 28,
 }) => {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 32 32"
-      fill="none"
-      aria-hidden="true"
-      style={{ width: size, height: size }}
-    >
-      <path
-        d="m16 3 12 7-12 7L4 10 16 3Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      <path
-        d="m4 16 12 7 12-7M4 22l12 7 12-7"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="26" cy="5" r="3" fill="#5A7BF0" stroke="#F9FBFF" strokeWidth="2" />
-    </svg>
+    <img
+      src={logoPng}
+      alt="SkillDock Logo"
+      className={`brand-logo select-none ${className}`}
+      style={{ width: size, height: size, objectFit: 'contain' }}
+      draggable={false}
+    />
   );
 };
 

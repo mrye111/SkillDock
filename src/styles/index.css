@@ -20,9 +20,15 @@
   --orange-tint: #fffbeb;
   --red: #dc2626;
   --red-tint: #fef2f2;
-  --radius: 8px;
+  --radius: 12px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  /* Fluent 2 / Mica & Ribbon 变量 */
+  --mica-bg: rgba(255, 255, 255, 0.65);
+  --mica-border: rgba(255, 255, 255, 0.85);
+  --mica-shadow: 0 24px 64px -12px rgba(79, 70, 229, 0.12), 0 8px 24px -6px rgba(15, 23, 42, 0.06);
+  --ribbon-gradient: linear-gradient(135deg, #3b82f6 0%, #6366f1 45%, #a855f7 80%, #ec4899 100%);
+  --ribbon-warm: linear-gradient(135deg, #f43f5e 0%, #fb7185 40%, #fb923c 100%);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   color: var(--ink);
   font-size: 13px;
   font-synthesis: none;
@@ -270,48 +276,186 @@ kbd {
   margin: 0 2px;
 }
 
-/* 主应用外壳：实心、无模糊、全屏铺满 */
-.app-shell {
-  height: 100vh;
-  min-height: 100vh;
-  max-width: 100%;
-  margin: 0;
-  border: none;
-  border-radius: 0;
-  background: #ffffff;
-  box-shadow: none;
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  overflow: hidden;
+/* -------------------------------------------------------------------------- */
+/* 丝带元素与流体氛围背景（Ribbon & Atmosphere Backing）                     */
+/* -------------------------------------------------------------------------- */
+.app-viewport {
+  position: relative;
   width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  background: #f0f6ff;
 }
 
-/* 侧边栏：实心浅灰，边界分明 */
+.ribbon-backdrop-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.ribbon-sky-gradient {
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(ellipse at 0% 0%, rgba(219, 234, 254, 0.85) 0%, transparent 60%),
+    radial-gradient(ellipse at 100% 0%, rgba(254, 215, 170, 0.7) 0%, transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgba(254, 205, 211, 0.75) 0%, transparent 55%),
+    radial-gradient(ellipse at 0% 100%, rgba(199, 210, 254, 0.8) 0%, transparent 60%),
+    linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 30%, #faf5ff 70%, #fff1f2 100%);
+}
+
+.ribbon-glow-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  opacity: 0.65;
+}
+
+.glow-top-left {
+  top: -100px;
+  left: -100px;
+  width: 540px;
+  height: 540px;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.5) 0%, rgba(129, 140, 248, 0.25) 50%, transparent 70%);
+}
+
+.glow-top-right {
+  top: -120px;
+  right: -80px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(251, 146, 60, 0.45) 0%, rgba(244, 63, 94, 0.3) 50%, transparent 75%);
+}
+
+.glow-bottom-left {
+  bottom: -120px;
+  left: -80px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.5) 0%, rgba(192, 132, 252, 0.35) 50%, transparent 70%);
+}
+
+.glow-center {
+  top: 30%;
+  left: 45%;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(244, 114, 182, 0.2) 0%, rgba(167, 139, 250, 0.15) 50%, transparent 70%);
+}
+
+.ribbon-svg-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: scale(1.02);
+  transition: transform 0.6s ease;
+}
+
+.ribbon-sheen-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(255, 255, 255, 0.35) 100%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 主应用外壳：透光云母玻璃质感、微发光边框                                   */
+/* -------------------------------------------------------------------------- */
+.app-shell {
+  position: relative;
+  z-index: 1;
+  height: 100vh;
+  min-height: 100vh;
+  width: 100vw;
+  max-width: 100%;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(40px) saturate(190%);
+  -webkit-backdrop-filter: blur(40px) saturate(190%);
+  border-top: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* 侧边栏：细腻云母透光、柔和微质感 */
 .sidebar {
   padding: 20px 16px 16px;
   display: flex;
   flex-direction: column;
-  background: #f8fafc;
-  border-right: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border-right: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: inset -1px 0 0 rgba(226, 232, 240, 0.35);
   min-height: 0;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-left: 8px;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  color: #0f172a;
-  height: 36px;
+  gap: 12px;
+  padding: 0 4px;
+  height: 44px;
 }
 
-.brand > svg {
-  width: 28px;
-  height: 28px;
-  color: #2563eb;
+.brand-tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 
+    0 4px 14px -2px rgba(59, 130, 246, 0.16),
+    0 2px 6px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.brand:hover .brand-tile {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 
+    0 6px 18px -2px rgba(59, 130, 246, 0.22),
+    0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: #0f172a;
+}
+
+.brand-caption {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #6366f1;
+}
+
+.brand-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
 }
 
 .workspace-switch {
@@ -319,19 +463,22 @@ kbd {
   align-items: center;
   gap: 10px;
   text-align: left;
-  margin: 18px 0 24px;
+  margin: 16px 0 20px;
   padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  transition: all 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.03);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   width: 100%;
 }
 
 .workspace-switch:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 14px -2px rgba(99, 102, 241, 0.08);
+  transform: translateY(-1px);
 }
 
 .workspace-switch > span:nth-child(2) {
@@ -365,9 +512,10 @@ kbd {
 .workspace-icon {
   width: 32px;
   height: 32px;
-  border-radius: 6px;
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.08);
   display: grid;
   place-items: center;
   color: #2563eb;
@@ -395,18 +543,19 @@ kbd {
 }
 
 .main-nav a, .main-nav button {
-  padding: 9px 12px;
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-radius: 6px;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 500;
-  color: #334155;
-  transition: all 0.15s ease;
-  position: relative;
-  text-align: left;
+  color: #475569;
+  background: transparent;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   width: 100%;
+  text-align: left;
 }
 
 .main-nav a svg, .main-nav button svg {
@@ -414,26 +563,45 @@ kbd {
   height: 18px;
   stroke-width: 1.75;
   color: #64748b;
-  transition: color 0.15s ease;
+  transition: color 0.15s ease, transform 0.15s ease;
 }
 
 .main-nav a:hover, .main-nav button:hover {
   color: #0f172a;
-  background: #f1f5f9;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .main-nav a:hover svg, .main-nav button:hover svg {
-  color: #0f172a;
+  color: #3b82f6;
+  transform: scale(1.05);
 }
 
+/* 激活态：参考图 1 风格白色圆角浮动胶囊 */
 .main-nav a.active, .main-nav button.active {
-  color: #2563eb;
-  background: #eff6ff;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.96);
   font-weight: 600;
+  box-shadow: 
+    0 3px 12px -2px rgba(15, 23, 42, 0.05),
+    0 1px 2px rgba(15, 23, 42, 0.02),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  border: 1px solid rgba(255, 255, 255, 0.95);
 }
 
 .main-nav a.active svg, .main-nav button.active svg {
   color: #2563eb;
+}
+
+/* 丝带竖条微指示器（参考图 1 同款蓝紫粉渐变竖向丝带） */
+.ribbon-indicator {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3.5px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.45);
 }
 
 .main-nav a small, .main-nav button small {
@@ -441,7 +609,7 @@ kbd {
   font-size: 11px;
   font-weight: 600;
   color: #2563eb;
-  background: #dbeafe;
+  background: #eff6ff;
   border-radius: 10px;
   padding: 1px 7px;
 }
@@ -482,9 +650,11 @@ kbd {
   color: var(--muted);
 }
 
-/* 工作空间与顶部栏 */
+/* 工作空间与顶部栏：云母玻璃透光、微发光接缝 */
 .workspace {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(36px) saturate(190%);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -495,12 +665,15 @@ kbd {
 .topbar {
   height: 56px;
   flex: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.8);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 32px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 1px 0 rgba(226, 232, 240, 0.45);
 }
 
 .breadcrumb {
@@ -541,7 +714,7 @@ kbd {
 .icon-button {
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -551,7 +724,8 @@ kbd {
 
 .icon-button:hover {
   color: #0f172a;
-  background: #f1f5f9;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
 .icon-button svg {
@@ -570,7 +744,7 @@ kbd {
   padding: 28px 32px 100px;
   scroll-behavior: smooth;
   outline: 0;
-  background: #ffffff;
+  background: transparent;
 }
 
 .page {
@@ -602,7 +776,7 @@ kbd {
 }
 
 .eyebrow {
-  color: #2563eb;
+  color: #6366f1;
   font-size: 11px;
   letter-spacing: 1.5px;
   margin-bottom: 6px;
@@ -615,12 +789,12 @@ kbd {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 0 16px;
   font-size: 13px;
   font-weight: 550;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   border: 1px solid transparent;
 }
 
@@ -638,29 +812,30 @@ kbd {
 }
 
 .button.primary {
-  background: #2563eb;
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
   color: #ffffff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  border-color: transparent;
 }
 
 .button.primary:hover:not(:disabled) {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+  background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 100%);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
 }
 
 .button.secondary {
-  border-color: #cbd5e1;
-  background: #ffffff;
+  border-color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
   color: #334155;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 .button.secondary:hover:not(:disabled) {
-  border-color: #94a3b8;
-  background: #f8fafc;
+  border-color: rgba(255, 255, 255, 1);
+  background: #ffffff;
   color: #0f172a;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.06);
 }
 
 .button.ghost {
@@ -669,7 +844,7 @@ kbd {
 }
 
 .button.ghost:hover:not(:disabled) {
-  background: #f1f5f9;
+  background: rgba(255, 255, 255, 0.65);
   color: #0f172a;
 }
 
@@ -719,23 +894,26 @@ kbd {
 
 /* 源库信息条：实体浅底，清晰边框与数据 */
 .source-strip {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
-  padding: 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 16px 20px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 20px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  gap: 16px;
+  margin-bottom: 22px;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.03), 0 1px 3px rgba(15, 23, 42, 0.02);
 }
 
 .source-glyph {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.1);
   display: grid;
   place-items: center;
   color: #2563eb;
@@ -805,61 +983,61 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 15px;
-  margin-bottom: 14px;
-  min-height: 36px;
+  gap: 16px;
+  margin-bottom: 16px;
+  min-height: 38px;
 }
 
 .tabs {
   display: flex;
-  gap: 24px;
+  gap: 4px;
   align-items: center;
   min-width: 0;
+  background: rgba(241, 245, 249, 0.65);
+  padding: 3px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
 }
 
 .tab {
   display: flex;
   gap: 6px;
   align-items: center;
-  padding: 8px 0;
-  position: relative;
-  color: #475569;
+  padding: 6px 12px;
+  border-radius: 9px;
+  color: #64748b;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
-  transition: color 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tab:hover {
   color: #0f172a;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.tab.active {
+  color: #0f172a;
+  background: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04), 0 0 1px rgba(15, 23, 42, 0.08);
+}
+
+.tab.active:after {
+  display: none;
 }
 
 .tab .count {
   font-size: 11px;
   color: #64748b;
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 1px 6px;
   line-height: 1.4;
-  background: #f1f5f9;
+  background: rgba(241, 245, 249, 0.9);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-}
-
-.tab.active {
-  color: #2563eb;
-  font-weight: 600;
-}
-
-.tab.active:after {
-  content: "";
-  height: 2px;
-  border-radius: 2px;
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  background: #2563eb;
-  animation: lineIn 0.22s var(--ease);
 }
 
 .tab.active .count {
@@ -870,16 +1048,18 @@ kbd {
 .search-box {
   display: flex;
   align-items: center;
-  gap: 8px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  border-radius: 6px;
-  padding: 0 10px;
-  height: 34px;
-  width: 240px;
+  gap: 10px;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  border-radius: 12px;
+  padding: 0 12px;
+  height: 36px;
+  width: 250px;
   flex: none;
   color: #64748b;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
 }
 
 .search-box > svg {
@@ -905,8 +1085,9 @@ kbd {
 }
 
 .search-box:focus-within {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  border-color: #6366f1;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12), 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 .search-box kbd {
@@ -917,15 +1098,19 @@ kbd {
   border: 1px solid #cbd5e1;
   background: #f8fafc;
   font-weight: 500;
+  border-radius: 4px;
+  padding: 2px 5px;
 }
 
 /* 同步矩阵表格：实心纯白背景、清爽分割、高清晰度字体 */
 .table-container {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
   overflow: auto;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  box-shadow: 0 8px 32px -4px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.02);
 }
 
 .skills-table {
@@ -939,12 +1124,13 @@ kbd {
 }
 
 .skills-table th {
-  height: 42px;
+  height: 44px;
   color: #475569;
-  background: #f8fafc;
+  background: rgba(248, 250, 252, 0.85);
+  backdrop-filter: blur(12px);
   font-weight: 600;
   font-size: 12px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
 }
 
 .skills-table th.check, .skills-table td.check {
@@ -1172,22 +1358,27 @@ kbd {
   color: #64748b;
 }
 
-/* 浮动操作底栏：纯白实心、坚实阴影、极高对比度 */
+/* 浮动操作底栏：云母玻璃胶囊、绚丽丝带渐变 */
 .selection-dock {
   position: absolute;
   left: 32px;
   right: 32px;
-  bottom: 20px;
+  bottom: 24px;
   max-width: 1280px;
   margin: auto;
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px 18px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
+  padding: 12px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 
+    0 20px 50px -10px rgba(99, 102, 241, 0.18),
+    0 8px 24px -4px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
   z-index: 10;
   animation: dockIn 0.22s var(--ease);
 }
@@ -1195,13 +1386,14 @@ kbd {
 .selection-count {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
-  background: #2563eb;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2563eb 0%, #6366f1 100%);
   color: #ffffff;
   display: grid;
   place-items: center;
   font-size: 13px;
   font-weight: 700;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 
 .selection-copy {
@@ -1217,24 +1409,36 @@ kbd {
 
 .selection-copy small {
   font-size: 11px;
-  color: #475569;
+  color: #64748b;
   display: block;
   margin-top: 2px;
 }
 
 .selection-dock .button.primary {
-  height: 36px;
+  height: 38px;
   min-width: 120px;
   font-weight: 600;
+  background: linear-gradient(135deg, #2563eb 0%, #6366f1 50%, #8b5cf6 100%);
+  border: none;
+  color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.selection-dock .button.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8 0%, #4f46e5 50%, #7c3aed 100%);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.48);
+  transform: translateY(-1px);
 }
 
 .selection-empty {
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-  bottom: 20px;
-  background: #f8fafc;
-  border-color: #e2e8f0;
-  padding-top: 11px;
-  padding-bottom: 11px;
+  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.03);
+  bottom: 24px;
+  background: rgba(248, 250, 252, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 
 .selection-empty .selection-copy strong {
@@ -2001,12 +2205,14 @@ kbd {
   margin-top: 16px;
 }
 
-/* 遮罩与抽屉：专业实体暗色遮罩与纯白面板 */
+/* 遮罩与抽屉：云母毛玻璃遮罩与半透明质感面板 */
 .overlay {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(15, 23, 42, 0.4);
+  background: rgba(15, 23, 42, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   justify-content: flex-end;
   animation: veil 0.15s ease;
@@ -2016,12 +2222,14 @@ kbd {
   width: 530px;
   max-width: calc(100vw - 40px);
   height: 100%;
-  background: #ffffff;
-  box-shadow: -10px 0 35px rgba(15, 23, 42, 0.15);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(36px) saturate(190%);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
+  box-shadow: -15px 0 45px rgba(99, 102, 241, 0.12), -4px 0 16px rgba(15, 23, 42, 0.06);
   display: flex;
   flex-direction: column;
   animation: slideIn 0.25s var(--ease);
-  border-left: 1px solid #e2e8f0;
+  border-left: 1px solid rgba(255, 255, 255, 0.9);
 }
 
 .drawer-header {
@@ -2383,11 +2591,13 @@ kbd {
 }
 
 .modal {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(36px) saturate(190%);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
   width: 460px;
-  border-radius: 12px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
-  border: 1px solid #cbd5e1;
+  border-radius: 18px;
+  box-shadow: 0 25px 60px -10px rgba(99, 102, 241, 0.22), 0 10px 25px -5px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 1);
+  border: 1px solid rgba(255, 255, 255, 0.95);
   animation: modalIn 0.2s var(--ease);
   overflow: hidden;
   max-height: 90vh;
@@ -2571,6 +2781,26 @@ kbd {
 .task-orbit.done {
   background: #f0fdf4;
   color: #16a34a;
+}
+
+.task-orbit.failed:after {
+  animation: none;
+  border-color: #fecdd3;
+}
+
+.task-orbit.failed {
+  background: #fff1f2;
+  color: #e11d48;
+}
+
+.task-orbit.cancelled:after {
+  animation: none;
+  border-color: #e2e8f0;
+}
+
+.task-orbit.cancelled {
+  background: #f8fafc;
+  color: #64748b;
 }
 
 .task-orbit svg {
@@ -2983,13 +3213,19 @@ kbd {
     padding-right: 11px;
   }
   .brand {
-    font-size: 18px;
+    font-size: 16px;
     gap: 8px;
-    padding-left: 8px;
+    padding-left: 4px;
   }
-  .brand > svg {
-    width: 25px;
-    height: 25px;
+  .brand-tile {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+  }
+  .brand-logo {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
   }
   .workspace-switch {
     padding: 9px 7px;

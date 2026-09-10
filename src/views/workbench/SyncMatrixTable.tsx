@@ -98,19 +98,25 @@ export const SyncMatrixTable: React.FC = () => {
                     ? selectableSkills.filter((s) => selectedSkillIds.has(s.skillId))
                     : selectableSkills;
 
-                // 统计已处于有效活动映射状态的技能数量
-                const activeCount = targetSkills.filter((s) =>
-                  isCellActiveMapped(s.targets[t.physicalTargetId])
+                // 统计已有关联的技能数量（包括活动与已暂停状态）
+                const mappedSkills = targetSkills.filter((s) => {
+                  const cell = s.targets[t.physicalTargetId];
+                  return Boolean(cell?.mappingId && cell.state !== 'no_mapping');
+                });
+                const mappedCount = mappedSkills.length;
+                const pausedCount = mappedSkills.filter(
+                  (s) => s.targets[t.physicalTargetId]?.state === 'paused'
                 ).length;
                 const totalCount = targetSkills.length;
-                const isAllMapped = totalCount > 0 && activeCount === totalCount;
-                const isIndeterminate = activeCount > 0 && activeCount < totalCount;
+                const isAllMapped = totalCount > 0 && mappedCount === totalCount;
+                const isIndeterminate = mappedCount > 0 && mappedCount < totalCount;
 
                 const countScope = selectedSkillIds.size > 0 ? `选中的 ${selectedSkillIds.size} 项` : '全部有效';
+                const pausedText = pausedCount > 0 ? `，含 ${pausedCount} 项暂停` : '';
                 const headerTitle = isAllMapped
-                  ? `${t.displayName} · 已全部关联 (${activeCount}/${totalCount}) · 点击取消关联`
+                  ? `${t.displayName} · 已全部关联 (${mappedCount}/${totalCount}${pausedText}) · 点击取消关联`
                   : isIndeterminate
-                  ? `${t.displayName} · 部分关联 (${activeCount}/${totalCount}) · 点击关联${countScope}`
+                  ? `${t.displayName} · 部分关联 (${mappedCount}/${totalCount}${pausedText}) · 点击关联${countScope}`
                   : `${t.displayName} · 未关联 (0/${totalCount}) · 点击为${countScope}开启关联`;
 
                 return (
@@ -123,17 +129,25 @@ export const SyncMatrixTable: React.FC = () => {
                         }}
                         checked={isAllMapped}
                         disabled={totalCount === 0}
-                        aria-label={`切换 ${t.displayName} 的关联状态 (${activeCount}/${totalCount})`}
+                        aria-label={`切换 ${t.displayName} 的关联状态 (${mappedCount}/${totalCount}${pausedText})`}
                         onChange={() => {
                           const shouldEnable = !isAllMapped;
                           const targetSkillIds = targetSkills.map((s) => s.skillId);
                           batchAssignTarget(targetSkillIds, t.physicalTargetId, shouldEnable);
                         }}
-                        className="cursor-pointer flex-none"
+                        className="cursor-pointer flex-none transition-transform active:scale-95"
                       />
                       <span className="agent-heading min-w-0 truncate">
                         <ToolIcon adapterId={t.adapterId} />
                         <span className="truncate">{t.displayName}</span>
+                        {isIndeterminate && (
+                          <span
+                            className="text-[10px] text-amber-600 bg-amber-50 px-1 py-0.5 rounded font-mono font-normal ml-auto flex-none"
+                            title={`部分关联: ${mappedCount}/${totalCount}`}
+                          >
+                            {mappedCount}/{totalCount}
+                          </span>
+                        )}
                       </span>
                     </div>
                   </th>

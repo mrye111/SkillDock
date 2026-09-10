@@ -16,14 +16,18 @@ import { AddLibraryModal } from '../modals/AddLibraryModal';
 import { AddTargetModal } from '../modals/AddTargetModal';
 import { TaskProgressModal } from '../modals/TaskProgressModal';
 import { RecoveryModal } from '../modals/RecoveryModal';
+import { RibbonBackdrop } from '../common/RibbonBackdrop';
 import { Toast } from '../common/Toast';
 
 export const AppLayout: React.FC = () => {
   const { currentTab, toast, clearToast } = useApp();
 
   return (
-    <>
-      {/* 主应用外壳 —— 铺满整个窗口 */}
+    <div className="app-viewport">
+      {/* 丝带流动立体氛围背景（云母毛玻璃底层透光） */}
+      <RibbonBackdrop />
+
+      {/* 主应用外壳 —— 云母玻璃浮动窗体 */}
       <div className="app-shell">
         {/* 左侧导航栏 */}
         <Sidebar />
@@ -67,6 +71,6 @@ export const AppLayout: React.FC = () => {
           onClose={clearToast}
         />
       )}
-    </>
+    </div>
   );
 };

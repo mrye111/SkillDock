@@ -96,6 +96,14 @@ export const SettingsView: React.FC = () => {
     }
   };
 
+  const handleOpenLogDir = async () => {
+    try {
+      await invokeCommand('open_registered_path', { kind: 'log_dir', id: '' });
+    } catch (e: any) {
+      showToast(`打开日志目录失败: ${e?.message || e}`, 'error');
+    }
+  };
+
   const formatSize = (bytes: number) => {
     if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GB`;
     if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(0)} MB`;
@@ -252,10 +260,45 @@ export const SettingsView: React.FC = () => {
           </div>
         </section>
 
-        {/* 03 键盘快捷键 */}
+        {/* 03 操作日志 */}
         <section className="settings-section">
           <div className="settings-section-heading">
             <span className="section-number">03</span>
+            <div>
+              <h2>操作日志与审计</h2>
+              <p>每次同步、移除或恢复，均按只追加格式完整留痕。</p>
+            </div>
+          </div>
+
+          <div className="setting-body">
+            <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/70 backdrop-blur">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1 text-xs text-slate-600">
+                  <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <Icon name="document" size={14} />
+                    <span>SkillDock-操作日志.jsonl</span>
+                  </div>
+                  <p>
+                    保存在系统文档目录（<code>%USERPROFILE%\Documents\SkillDock</code>），每个任务以单行独立 JSON 格式存储，不随数据库重装或损坏丢失，适合长效审计与故障排查。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="button secondary small inline-flex items-center gap-1.5 flex-none"
+                  onClick={handleOpenLogDir}
+                >
+                  <Icon name="folder" size={13} />
+                  <span>打开日志目录</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 04 键盘快捷键 */}
+        <section className="settings-section">
+          <div className="settings-section-heading">
+            <span className="section-number">04</span>
             <div>
               <h2>键盘快捷键</h2>
               <p>把常用操作，留在手边。</p>

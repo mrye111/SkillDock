@@ -31,7 +31,7 @@ export const SelectionDock: React.FC = () => {
   const physicalTargetSet = new Set(
     selectedSkills.flatMap((s) =>
       Object.entries(s.targets)
-        .filter(([, c]) => isCellActiveMapped(c))
+        .filter(([, c]) => Boolean(c?.mappingId && c.state !== 'no_mapping'))
         .map(([ptId]) => ptId)
     )
   );
@@ -59,7 +59,7 @@ export const SelectionDock: React.FC = () => {
           <strong>已选择 {selectedSkills.length} 个技能</strong>
           <small>
             {physicalTargetSet.size > 0
-              ? `${physicalTargetSet.size} 个物理目标已开启 · 执行前先查看具体变化`
+              ? `${physicalTargetSet.size} 个物理目标已关联 · 执行前先查看具体变化`
               : '所选技能尚未关联目标，请点击右侧目标一键开启'}
           </small>
         </div>
@@ -69,9 +69,10 @@ export const SelectionDock: React.FC = () => {
           <div className="flex items-center gap-1.5 flex-wrap max-w-[480px]">
             <span className="text-[11px] text-slate-400 font-medium mr-1 select-none">关联目标:</span>
             {physicalTargets.map((t) => {
-              const count = selectedSkills.filter((s) =>
-                isCellActiveMapped(s.targets[t.physicalTargetId])
-              ).length;
+              const count = selectedSkills.filter((s) => {
+                const cell = s.targets[t.physicalTargetId];
+                return Boolean(cell?.mappingId && cell.state !== 'no_mapping');
+              }).length;
               const isAll = count === selectedSkills.length;
               const isSome = count > 0 && !isAll;
 

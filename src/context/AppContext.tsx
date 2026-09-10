@@ -10,6 +10,8 @@ import type {
   RecoveryRequiredEvent,
   ScanProgressEvent,
   AppError,
+  ConflictChoice,
+  ConflictInfo,
 } from '../lib/backend-contract';
 import {
   invokeCommand,
@@ -80,6 +82,7 @@ interface AppContextType {
   currentPlan: SyncPlanView | null;
   setCurrentPlan: (plan: SyncPlanView | null) => void;
   requestSyncPreview: (specificMappingIds?: string[], operation?: 'sync' | 'remove' | 'restore') => Promise<void>;
+  resolveConflictsBulk: (kinds: ConflictInfo['kind'][], choice: ConflictChoice) => Promise<void>;
 
   // 任务执行与恢复
   activeTask: TaskSnapshot | null;
@@ -483,9 +486,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         await Promise.all(
           skillsToUpdate.map((skill) => {
+            // 保持关联的所有物理目标（包括活动与已暂停的映射）：用户语义是批量关联/取消此特定目标，而不是抹掉其它已暂停的关联
             const currentTargets = new Set(
               Object.entries(skill.targets)
-                .filter(([, c]) => isCellActiveMapped(c))
+                .filter(([, c]) => Boolean(c?.mappingId && c.state !== 'no_mapping'))
                 .map(([ptId]) => ptId)
             );
             if (enabled) {
@@ -602,6 +606,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     },
     [activeLibrary, selectedSkillIds, openDrawer, showToast]
+  );
+
+  // 批量解决冲突
+  const resolveConflictsBulk = useCallback(
+    async (kinds: ConflictInfo['kind'][], choice: ConflictChoice) => {
+      if (!currentPlan) return;
+      try {
+        const { plan, outcome } = await invokeCommand('resolve_conflicts_bulk', {
+          planId: currentPlan.planId,
+          planVersion: currentPlan.planVersion,
+          kinds,
+          choice,
+        });
+        setCurrentPlan(plan);
+        if (outcome.applied.length > 0) {
+          showToast(`已批量处理 ${outcome.applied.length} 项冲突`, 'success');
+        } else {
+          showToast('没有符合条件的未决冲突项', 'info');
+        }
+      } catch (e: any) {
+        showToast(`批量处理冲突失败: ${e?.message || e}`, 'error');
+      }
+    },
+    [currentPlan, showToast]
   );
 
   // 执行同步计划
@@ -822,6 +850,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentPlan,
       setCurrentPlan,
       requestSyncPreview,
+      resolveConflictsBulk,
       activeTask,
       isTaskModalOpen,
       setIsTaskModalOpen,
@@ -870,6 +899,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       closeDrawer,
       currentPlan,
       requestSyncPreview,
+      resolveConflictsBulk,
       activeTask,
       isTaskModalOpen,
       executePlan,

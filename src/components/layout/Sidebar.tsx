@@ -15,14 +15,19 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside className="sidebar">
-      {/* 品牌 Logo */}
+      {/* 品牌 Logo 浮动微质感磁贴 */}
       <div
         className="brand cursor-pointer select-none"
         onClick={() => setCurrentTab('workbench')}
         aria-label="SkillDock 技能库"
       >
-        <BrandLogo />
-        <span>SkillDock</span>
+        <div className="brand-tile">
+          <BrandLogo size={22} />
+        </div>
+        <div className="brand-copy">
+          <span className="brand-name">SkillDock</span>
+          <span className="brand-caption">Desktop Sync</span>
+        </div>
       </div>
 
       {/* 工作空间切换器 */}
@@ -54,6 +59,7 @@ export const Sidebar: React.FC = () => {
           className={currentTab === 'workbench' ? 'active' : ''}
           onClick={() => setCurrentTab('workbench')}
         >
+          {currentTab === 'workbench' && <span className="ribbon-indicator" />}
           <Icon name="layers" size={17} />
           <span>技能库</span>
           <small>{skillCount}</small>
@@ -64,6 +70,7 @@ export const Sidebar: React.FC = () => {
           className={currentTab === 'targets' ? 'active' : ''}
           onClick={() => setCurrentTab('targets')}
         >
+          {currentTab === 'targets' && <span className="ribbon-indicator" />}
           <Icon name="target" size={17} />
           <span>同步目标</span>
         </button>
@@ -73,6 +80,7 @@ export const Sidebar: React.FC = () => {
           className={currentTab === 'history' ? 'active' : ''}
           onClick={() => setCurrentTab('history')}
         >
+          {currentTab === 'history' && <span className="ribbon-indicator" />}
           <Icon name="history" size={17} />
           <span>同步历史</span>
         </button>
@@ -86,6 +94,7 @@ export const Sidebar: React.FC = () => {
             className={currentTab === 'settings' ? 'active' : ''}
             onClick={() => setCurrentTab('settings')}
           >
+            {currentTab === 'settings' && <span className="ribbon-indicator" />}
             <Icon name="settings" size={17} />
             <span>设置</span>
           </button>

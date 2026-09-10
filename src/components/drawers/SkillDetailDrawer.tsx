@@ -35,7 +35,7 @@ export const SkillDetailDrawer: React.FC = () => {
     if (skill) {
       const active = new Set<string>();
       for (const [ptId, cell] of Object.entries(skill.targets)) {
-        if (isCellActiveMapped(cell)) {
+        if (cell?.mappingId && cell.state !== 'no_mapping') {
           active.add(ptId);
         }
       }

@@ -4,7 +4,7 @@ import { Drawer } from '../common/Drawer';
 import { Icon, ToolIcon } from '../common/Icon';
 import { ActionBadge } from '../common/Badge';
 import { invokeCommand } from '../../services/api';
-import type { ConflictChoice, PlanItemView } from '../../lib/backend-contract';
+import type { ConflictChoice, ConflictInfo, PlanItemView } from '../../lib/backend-contract';
 
 const CHOICE_LABELS: Record<ConflictChoice, string> = {
   keep_target: '本次保留目标',
@@ -25,11 +25,13 @@ export const SyncPlanDrawer: React.FC = () => {
     currentPlan,
     setCurrentPlan,
     executePlan,
+    resolveConflictsBulk,
     targets,
     showToast,
   } = useApp();
 
   const [resolvingItemId, setResolvingItemId] = useState<string | null>(null);
+  const [isBulkResolving, setIsBulkResolving] = useState(false);
 
   if (drawer.type !== 'sync_plan' || !currentPlan) {
     return null;
@@ -65,6 +67,50 @@ export const SyncPlanDrawer: React.FC = () => {
       showToast(`冲突决策失败: ${e?.message || e}`, 'error');
     } finally {
       setResolvingItemId(null);
+    }
+  };
+
+  // 待决冲突项统计（直接计算，严禁在 early return 后使用 React Hook 以免违反 Rules of Hooks 导致白屏）
+  const allConflictItems = groups.flatMap((g) => g.items.filter((it) => Boolean(it.conflict)));
+
+  // 相同内容冲突（可零风险一键接管）
+  const sameContentConflicts = allConflictItems.filter(
+    (it) =>
+      it.conflict?.kind === 'same_content' &&
+      it.conflict?.availableChoices.includes('adopt_existing')
+  );
+
+  // 可保留目标冲突
+  const keepTargetConflicts = allConflictItems.filter((it) =>
+    it.conflict?.availableChoices.includes('keep_target')
+  );
+
+  // 一键接管全部内容一致项
+  const handleAdoptAllSameContent = async () => {
+    setIsBulkResolving(true);
+    try {
+      await resolveConflictsBulk(['same_content'], 'adopt_existing');
+    } finally {
+      setIsBulkResolving(false);
+    }
+  };
+
+  // 批量保留目标
+  const handleKeepAllTarget = async () => {
+    setIsBulkResolving(true);
+    try {
+      const kinds = Array.from(
+        new Set(
+          keepTargetConflicts
+            .map((it) => it.conflict?.kind)
+            .filter((k): k is ConflictInfo['kind'] => Boolean(k))
+        )
+      );
+      if (kinds.length > 0) {
+        await resolveConflictsBulk(kinds, 'keep_target');
+      }
+    } finally {
+      setIsBulkResolving(false);
     }
   };
 
@@ -124,6 +170,57 @@ export const SyncPlanDrawer: React.FC = () => {
           <small>需要处理</small>
         </div>
       </div>
+
+      {/* 冲突批量快速处理工具条 */}
+      {summary.conflictCount > 0 && (sameContentConflicts.length > 0 || keepTargetConflicts.length > 0) && (
+        <div className="p-3.5 mb-4 rounded-xl border border-amber-200/80 bg-gradient-to-r from-amber-50/90 to-orange-50/80 backdrop-blur shadow-sm">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <Icon name="shield" size={12} />
+              </span>
+              <strong className="text-xs font-semibold text-amber-900">
+                检测到 {summary.conflictCount} 项待决策冲突
+              </strong>
+            </div>
+            <span className="text-[11px] text-amber-700">
+              推荐批量快速决策
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-amber-200/50">
+            {sameContentConflicts.length > 0 && (
+              <button
+                type="button"
+                className="button primary small inline-flex items-center gap-1.5 shadow-sm text-xs"
+                disabled={isBulkResolving}
+                onClick={handleAdoptAllSameContent}
+                title="源与目标文件逐字节完全一致，安全接管并建立管理基线"
+              >
+                <Icon name="check" size={13} />
+                <span>
+                  {isBulkResolving ? '正在批量处理...' : `全部接管内容一致项 (${sameContentConflicts.length})`}
+                </span>
+              </button>
+            )}
+
+            {keepTargetConflicts.length > 0 && (
+              <button
+                type="button"
+                className="button secondary small inline-flex items-center gap-1.5 text-xs"
+                disabled={isBulkResolving}
+                onClick={handleKeepAllTarget}
+                title="本次不覆盖目标文件，保留目标端当前内容"
+              >
+                <Icon name="history" size={13} />
+                <span>
+                  {isBulkResolving ? '正在批量处理...' : `全部保留目标 (${keepTargetConflicts.length})`}
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 按目标分组展示 */}
       {groups.map((group) => {

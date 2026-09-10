@@ -107,6 +107,39 @@ export async function invokeCommand<N extends ContractCommandName>(
       }
       return updatedPlan as ContractCommands[N]['result'];
     }
+    case 'resolve_conflicts_bulk': {
+      const arg = args as ContractCommands['resolve_conflicts_bulk']['args'];
+      const updatedPlan = JSON.parse(JSON.stringify(MOCK_SYNC_PLAN));
+      updatedPlan.planVersion += 1;
+      const applied: string[] = [];
+      const skipped: string[] = [];
+      for (const group of updatedPlan.groups) {
+        for (const item of group.items) {
+          if (item.conflict && arg.kinds.includes(item.conflict.kind)) {
+            if (item.conflict.availableChoices.includes(arg.choice)) {
+              item.decision = arg.choice;
+              if (arg.choice === 'adopt_existing') {
+                item.action = 'adopt';
+                item.conflict = null;
+                item.selected = true;
+              } else if (arg.choice === 'keep_target') {
+                item.action = 'skip';
+                item.conflict = null;
+                item.selected = false;
+              } else if (arg.choice === 'overwrite_with_source') {
+                item.action = 'overwrite';
+                item.conflict = null;
+                item.selected = true;
+              }
+              applied.push(item.itemId);
+            } else {
+              skipped.push(item.itemId);
+            }
+          }
+        }
+      }
+      return { plan: updatedPlan, outcome: { applied, skipped } } as ContractCommands[N]['result'];
+    }
     case 'execute_sync_plan':
       return { taskId: 'task-sync-999' } as ContractCommands[N]['result'];
     case 'get_task_snapshot':
